@@ -1860,7 +1860,7 @@ class MM_body(QMainWindow):
         # object.setGraphicsEffect(shadow)
 
 
-
+#test
 
 
 
