@@ -13,13 +13,10 @@ from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QCheckBox, QListWidget
 import os
 from pathlib import Path
 
-
-# Вероятна ошибка при соединении двух питон файлов в .exe
 py_path = os.path.abspath("Main.py")
 py_path = py_path.replace("Main.py", 'Склад', 1)
 
 main_path = os.getcwd()
-
 
 filelist = [f for f in os.listdir(main_path)]
 if 'Склад' not in filelist:
@@ -36,7 +33,6 @@ settings_mass = [0, 0, 0]
 file_trail = py_path
 yandex_file_trail = '-'
 categories_history = '-'
-#
 
 all_files_categories = []
 all_tags = []
@@ -52,18 +48,14 @@ try:
         yandex_file_trail = config_txt[3].strip()
         files_count = -1
         folder = Path(file_trail + file_trail[2])
-
         history_categories = config_txt[4].strip().split(',')
 
         if history_categories[0] == '-': history_categories = []
 
-
         if folder.is_dir():
-
             for file in folder.iterdir():
                 files_count += 1
                 max_str = ''
-
                 _file_name = file.name.split('§')[:-1]
 
                 for i in range(len(_file_name)):
@@ -78,7 +70,6 @@ try:
                     for j in range(len(_tags)):
                         if _tags[j] not in all_tags[all_files_categories.index(_file_name[i][0])]:
                             all_tags[all_files_categories.index(_file_name[i][0])].append(_tags[j])
-
 
                 for i in range(len(file.name)):
                     if file.name[i] in '0123456789':
@@ -112,7 +103,6 @@ except: # Нет необходимого файла config в корневой 
     config_file.write(standart_config)
     config_file.close()
 
-
 for i in range(len(all_tags)):
     all_tags[i].sort()
 
@@ -127,8 +117,6 @@ class Ui_MainWindow(object):
         global yandex_file_trail
 
         self.main_path = main_path
-
-
         self.sklad_trail = file_trail
         self.settings_mass = settings_mass
         self.folder_max_count = folder_count
@@ -170,11 +158,10 @@ class Ui_MainWindow(object):
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
         self.verticalLayout_11 = QtWidgets.QVBoxLayout(self.scrollAreaWidgetContents)
         self.verticalLayout_11.setObjectName("verticalLayout_11")
-
         self.verticalLayout_right_window = QtWidgets.QVBoxLayout()
         self.horizontalLayout_main = QtWidgets.QHBoxLayout()
 
-        self.horizontalLayout_main.addLayout(self.verticalLayout_11)
+        # self.horizontalLayout_main.addLayout(self.verticalLayout_11) ### Ошибка!
 
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         self.horizontalLayout_main.addWidget(self.scrollArea)
@@ -188,8 +175,6 @@ class Ui_MainWindow(object):
         self.verticalLayout_Main.addLayout(self.lowerbuttons_horizontal_layout)
         self.tabWidget.addTab(self.Main, "")
 
-        # Main_Window
-
         '''
         :param self.horizontalLayout_main: Лэйаут, содержащий скрол виджет и динамический блок
         :param verticalLayout_Main: Лэйаут всей главной страницы 
@@ -201,13 +186,8 @@ class Ui_MainWindow(object):
         self.pushbutton_open_folder.setText('Нажмите, чтобы выбрать папку с медиафайлами')
         self.pushbutton_open_folder.setMinimumSize(65,25)
         self.verticalLayout_11.addWidget(self.pushbutton_open_folder)
-
-
-
-
-
+        
         # Settings
-
         self.settings = QtWidgets.QWidget()
         self.settings.setObjectName("settings")
 

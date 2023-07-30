@@ -11,6 +11,9 @@ import os
 import sys
 import array
 import shutil
+from collections import Counter
+from pathlib import Path
+
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from moviepy.editor import VideoFileClip
 from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve
@@ -18,10 +21,9 @@ from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
     QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QScrollArea, QWidget, \
     QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox
-from collections import Counter
-from pathlib import Path
 import PyQt5.QtMultimediaWidgets
 from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem
+
 from ui import Ui_MainWindow
 
 
@@ -103,10 +105,11 @@ class MM_body(QMainWindow):
 
         for file in path.iterdir():
             _file_name = file.name
-
             try:
                 _file_type = (_file_name.split('.'))[-1]
-            except: _file_type = ''
+
+            except FileExistsError:
+                _file_type = ''
 
             if _file_type.lower() in photo_formats:
                 files_are_founded = True
@@ -135,7 +138,7 @@ class MM_body(QMainWindow):
         #     self.cancel_button.setEnabled(True)
 
 
-    def tags_splitting(self, file_way):
+    def tags_splitting(self, file_way : str) -> list:
         '''
         :return: Возвращаем массив с тегами, созданными по имени файла
         '''
@@ -156,8 +159,7 @@ class MM_body(QMainWindow):
         return tags_mass
 
 
-
-    def block_creator(self, file_way, file_is_photo):
+    def block_creator(self, file_way : str, file_is_photo : bool):
         '''
         :param ui.verticalLayout_11: Лэйаут скрол виджета
         :param horizontal_layout: Главный лэйаут блока
@@ -169,7 +171,6 @@ class MM_body(QMainWindow):
 
         # Сборка главного лэйаута блока
         horizontal_layout = QHBoxLayout()
-
         button_photo = QPushButton()
         button_photo.setMinimumSize(QSize(250, 170))
 
@@ -179,7 +180,6 @@ class MM_body(QMainWindow):
 
         if file_is_photo:
             icon = file_way
-
             self.file_way_mass.append(file_way)
             self.button_is_photo_mass.append(True)
 
@@ -187,12 +187,11 @@ class MM_body(QMainWindow):
             # Сохраняем первый кадр видео для иконки в кнопку
             video = VideoFileClip(file_way)
             video.save_frame(f'{self.frame_folder}/{len(self.photo_button_mass)}.png', t = 1)
-            #
+
             icon = f'{self.frame_folder}/{len(self.photo_button_mass)}.png'
 
             self.file_way_mass.append(file_way)
             self.button_is_photo_mass.append(False)
-
 
             # video_item = QGraphicsVideoItem()
             # video_item.setSize((QtCore.QSizeF(250,170)))
@@ -282,11 +281,9 @@ class MM_body(QMainWindow):
         button_delete_tag.pressed.connect(lambda: self.delete_tag(pressed_button_index))
 
 
-
-    def selection_type_change(self, value):
+    def selection_type_change(self, value : int):
         self.selection_type = value + 1
         self.right_block_cleaner()
-
 
 
     def upper_lower_layouts_creating(self):
@@ -330,9 +327,7 @@ class MM_body(QMainWindow):
         self.ui.lowerbuttons_horizontal_layout.addWidget(cancel_button)
 
 
-
     def save_tags(self):
-
         present_tags = self.all_tags_mass_creating()
 
         for i in range(len(self.previous_elements_mass)):
@@ -342,7 +337,6 @@ class MM_body(QMainWindow):
             # Нашли измененный блок
             if previous_block_tags != present_block_tags:
                 pass
-
 
 
     def right_block_cleaner(self):
@@ -369,8 +363,7 @@ class MM_body(QMainWindow):
         #     "QPushButton::pressed {background-color: #dadada;}")
 
 
-
-    def right_window_creating(self, pressed_button_index):
+    def right_window_creating(self, pressed_button_index : int):
         if self.right_block_create_test(pressed_button_index):
             print(f'Ready to create a block! Selection_type = {self.selection_type}')
             self.window_resize('right_window_opening')
@@ -435,8 +428,7 @@ class MM_body(QMainWindow):
             self.button_cancel_selection.setEnabled(True)
 
 
-
-    def right_window_changing(self, pressed_button_index):
+    def right_window_changing(self, pressed_button_index : int) -> bool:
         '''
         :param self.previous_button_index: индекс предпоследней нажатой кнопки
         :param selection_type: способ выделения фотографий (1 - одиночное, 2 - от и до, 3 - выборочное)
@@ -489,8 +481,7 @@ class MM_body(QMainWindow):
         self.button_cancel_selection.setEnabled(True)
 
 
-
-    def right_block_create_test(self, pressed_button_index):
+    def right_block_create_test(self, pressed_button_index : int):
         ''' Фунция проверяет, выполнены ли все условия для создания расширенного окна с медиафайлами '''
 
         if self.selection_type == 1: # Одиночное выделение 
@@ -510,8 +501,7 @@ class MM_body(QMainWindow):
             return self.selective_selection(pressed_button_index)
 
 
-
-    def from_to_selection(self, pressed_button_index):
+    def from_to_selection(self, pressed_button_index : int) -> bool:
         if self.first_pressed_index == -1: # Указание начала промежутка
             self.first_pressed_index = pressed_button_index
             self.photo_button_mass[pressed_button_index].setStyleSheet(
@@ -586,7 +576,7 @@ class MM_body(QMainWindow):
         return 
 
 
-    def selective_selection(self, pressed_button_index):
+    def selective_selection(self, pressed_button_index : int) -> bool:
         '''
         :return: Возвращаем True, если выполнены все условия для открытия right_block 
         '''
@@ -617,8 +607,7 @@ class MM_body(QMainWindow):
             return 
         
 
-
-    def arrow_button_pressed(self, side):
+    def arrow_button_pressed(self, side : str):
         '''
         Функция перелистывания медиафайлов в right_block 
 
@@ -677,8 +666,7 @@ class MM_body(QMainWindow):
                     self.left_arrow.setEnabled(True)
 
 
-
-    def add_tag(self, index):
+    def add_tag(self, index : int) -> None:
         if index != -1: # Нажатие на кнопку +
             line_edit_text = self.line_edits_mass[index].text()
 
@@ -694,12 +682,14 @@ class MM_body(QMainWindow):
                 if already_exist_tags:
                     for tag in line_edit_text:
                         tag = tag.strip()
+
                         if tag != ' ' and tag != '' and tag.lower() not in already_exist_tags:
                             self.list_widget_mass[index].addItem(tag)
 
                 else:
                     for tag in line_edit_text:
                         tag = tag.strip()
+
                         if tag != ' ' and tag != '':
                             self.list_widget_mass[index].addItem(tag)
 
@@ -715,8 +705,7 @@ class MM_body(QMainWindow):
         self.previous_and_present_tags_equal_test()
 
 
-
-    def delete_tag(self, index):
+    def delete_tag(self, index : int):
         a = self.list_widget_mass[index].selectedIndexes()
 
         _selected_index = self.list_widget_mass[index].count() - 1
@@ -743,7 +732,6 @@ class MM_body(QMainWindow):
         self.previous_and_present_tags_equal_test()
 
 
-
     def previous_and_present_tags_equal_test(self):
         present_tags = self.all_tags_mass_creating()
         is_equal = True
@@ -762,9 +750,9 @@ class MM_body(QMainWindow):
             self.cancel_button.setEnabled(False)
 
 
-
-    def all_tags_mass_creating(self):
+    def all_tags_mass_creating(self) -> list:
         all_tags_mass = []
+
         for i in range(len(self.list_widget_mass)):
             _mass = []
             if self.list_widget_mass[i].count() != 0:
@@ -776,8 +764,7 @@ class MM_body(QMainWindow):
         return all_tags_mass
 
 
-
-    def layout_cleaner(self, layout):
+    def layout_cleaner(self, layout : object):
         if layout is not None:
             while layout.count():
                 item = layout.takeAt(0)
@@ -787,7 +774,6 @@ class MM_body(QMainWindow):
                     widget.setParent(None)
                 else:
                     self.layout_cleaner(item.layout())
-
 
 
     # def ToolTip_enable(self, duration = 1):
@@ -1580,8 +1566,7 @@ class MM_body(QMainWindow):
     #
     #
     def keyPressEvent(self, e):
-        if self.ui.tabWidget.currentIndex() == 0: # Главный таб
-
+        if self.ui.tabWidget.currentIndex() == 0: # Главное окно с медиафайлами
             if e.key() == Qt.Key_Return:
                 self.add_tag(-1)
 
@@ -1793,7 +1778,12 @@ class MM_body(QMainWindow):
     #     self.PushButtons_return_StyleSheet()
     #
     #
-    def window_resize(self, type):
+    def window_resize(self, type : str):
+        """
+        Функция автоматического изменения размера окна
+
+        :param type: Переменная, отвечающая за вид изменения размера
+        """
         tabIndex = self.ui.tabWidget.currentIndex()
     
         self.animation = QPropertyAnimation(self, b'size')
@@ -1837,16 +1827,14 @@ class MM_body(QMainWindow):
         self.LastIndex = tabIndex
 
 
-
-    def pushbutton_style_creator(self, pushbutton):
+    def pushbutton_style_creator(self, pushbutton : object):
         pushbutton.setStyleSheet("QPushButton {background-color: #c7c7c7; border-radius: 7px; border: 1px solid #8a8a8a}"
                                                 "QPushButton::hover {background-color: #dedede;}"
                                                 "QPushButton::pressed {background-color: #dadada;}")
         self.setShadowEffect(pushbutton)
 
 
-
-    def setShadowEffect(self, object):
+    def setShadowEffect(self, object : object):
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(4)
         shadow.setXOffset(0)
@@ -1862,7 +1850,6 @@ class MM_body(QMainWindow):
         # object.setGraphicsEffect(shadow)
 
 
-
 # Установка иконки приложения
 try:
     from PyQt5.QtWinExtras import QtWin
@@ -1872,12 +1859,10 @@ except ImportError:
     print('MacOS opening')
 
 
-
 if __name__ == '__main__':
     app = QApplication([])
     app.setStyle(QStyleFactory.keys()[-1])
     application = MM_body()
     application.show()
     application.setWindowIcon(QIcon("icons/WindowIcon.png"))
-
     sys.exit(app.exec_())
