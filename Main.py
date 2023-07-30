@@ -448,6 +448,7 @@ class MM_body(QMainWindow):
         :param first_pressed_index: индекс первого нажатого элемента
         :param second_pressed_index: индекс второго нажатого элемента
         '''
+        
         if not(self.right_window_is_open):
             self.right_window_creating(pressed_button_index)
             return
@@ -490,9 +491,8 @@ class MM_body(QMainWindow):
 
 
     def right_block_create_test(self, pressed_button_index):
-        '''
-        Фунция проверяет, выполнены ли все условия для создания расширенного окна с медиафайлами
-        '''
+        ''' Фунция проверяет, выполнены ли все условия для создания расширенного окна с медиафайлами '''
+
         if self.selection_type == 1: # Одиночное выделение 
             self.photo_button_mass[pressed_button_index].setStyleSheet(
                 "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
@@ -535,7 +535,7 @@ class MM_body(QMainWindow):
             self.selected_files_mass = self.photo_button_mass[self.first_pressed_index:self.second_pressed_index + 1]
             self.selected_files_way_mass = self.file_way_mass[self.first_pressed_index:self.second_pressed_index + 1] 
 
-            return #True
+            return #True  # Раскомментировать, когда допишу функцию right_block_creator 
 
         else: # Уже выбран промежуток (изменение промежутка)
             # Изменение начала промежутка
@@ -550,7 +550,7 @@ class MM_body(QMainWindow):
 
             # Изменение конца промежутка
             elif pressed_button_index > self.second_pressed_index:
-                for i in range(self.second_pressed_index + 1, pressed_button_index):
+                for i in range(self.second_pressed_index + 1, pressed_button_index + 1):
                     self.photo_button_mass[i].setStyleSheet(
                         "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
                         "QPushButton::hover {background-color: #dedede;}"
@@ -582,7 +582,7 @@ class MM_body(QMainWindow):
             self.selected_files_mass = self.photo_button_mass[self.first_pressed_index:self.second_pressed_index + 1]
             self.selected_files_way_mass = self.file_way_mass[self.first_pressed_index:self.second_pressed_index + 1] 
 
-            return #True
+            return #True # Раскомментировать, когда допишу функцию right_block_creator 
         return 
 
 
@@ -624,7 +624,7 @@ class MM_body(QMainWindow):
 
         :param side: Переменная, обозначающая сторону, в которую будет выполняться перелистывание
         '''
-
+    
         if self.selection_type == 1:
             if side == 'left':
                 self.photo_button_mass[self.previous_button_index].setStyleSheet(
@@ -681,8 +681,8 @@ class MM_body(QMainWindow):
     def add_tag(self, index):
         if index != -1: # Нажатие на кнопку +
             line_edit_text = self.line_edits_mass[index].text()
-            if line_edit_text:
 
+            if line_edit_text:
                 already_exist_tags = []
 
                 for i in range(self.list_widget_mass[index].count()):
@@ -706,7 +706,6 @@ class MM_body(QMainWindow):
                 self.line_edits_mass[index].clear()
 
         else: # Функция вызвана нажатием кнопки Enter
-
             for i in range(len(self.line_edits_mass)):
                 if self.line_edits_mass[i].text() != '':
                     self.add_tag(i)
@@ -1837,11 +1836,14 @@ class MM_body(QMainWindow):
 
         self.LastIndex = tabIndex
 
+
+
     def pushbutton_style_creator(self, pushbutton):
         pushbutton.setStyleSheet("QPushButton {background-color: #c7c7c7; border-radius: 7px; border: 1px solid #8a8a8a}"
                                                 "QPushButton::hover {background-color: #dedede;}"
                                                 "QPushButton::pressed {background-color: #dadada;}")
         self.setShadowEffect(pushbutton)
+
 
 
     def setShadowEffect(self, object):
@@ -1860,9 +1862,6 @@ class MM_body(QMainWindow):
         # object.setGraphicsEffect(shadow)
 
 
-#test
-
-
 
 # Установка иконки приложения
 try:
@@ -1871,6 +1870,7 @@ try:
     QtWin.setCurrentProcessExplicitAppUserModelID(myappid)
 except ImportError:
     print('MacOS opening')
+
 
 
 if __name__ == '__main__':
