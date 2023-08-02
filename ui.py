@@ -488,13 +488,13 @@ class Ui_MainWindow(object):
     #             self.listWidget_mass[i].clear()
     #             self.lineEdit_tags_mass[i].clear()
     #
-    def setShadowEffect(self, object):
-        shadow = QtWidgets.QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(2)
-        shadow.setXOffset(1)
-        shadow.setYOffset(1)
-
-        object.setGraphicsEffect(shadow)
+    # def set_shadow_effect(self, object_ : object) -> None:
+    #     shadow = QtWidgets.QGraphicsDropShadowEffect()
+    #     shadow.setBlurRadius(2)
+    #     shadow.setXOffset(1)
+    #     shadow.setYOffset(1)
+    #
+    #     object_.setGraphicsEffect(shadow)
     #
     # def settings_init(self):
     #     self.checkBox_setting1.setChecked(settings_mass[0])
