@@ -19,17 +19,18 @@ from collections import Counter
 
 import PyQt5.QtMultimediaWidgets
 from screeninfo import get_monitors
-from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPaintEvent
 from moviepy.editor import VideoFileClip
 from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QPoint, QRect, \
-                        QTimer, pyqtSlot
+                        QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
-    QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QScrollArea, QWidget, \
-    QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox
+    QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
+    QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, QGraphicsOpacityEffect
 
 from ui import Ui_MainWindow
+from ScaledWidgets import ScaledLabel
 
 
 class MMBody(QMainWindow):
@@ -41,9 +42,12 @@ class MMBody(QMainWindow):
 
         #self.levels = 0
         #self.LastIndex = 0
+        self.move_animation = None
+        self.animation_group = None
+        self.right_window_label = None
+        self.selection_type = 1
         self.first_pressed_index = -1
         self.second_pressed_index = -1
-        self.selection_type = 1
         self.previous_button_index = 0
         self.line_edits_mass = []
         self.list_widget_mass = []
@@ -67,6 +71,7 @@ class MMBody(QMainWindow):
         self.db_init()
         self.window_resize('start')
 
+        self.ui.pushbutton_open_folder.pressed.connect(self.open_folder)
         # Конфигурация чекбоксов
         # self.ui.checkBox_setting1.stateChanged.connect(self.check_box_func)
         # self.ui.checkBox_setting2.stateChanged.connect(self.check_box_func)
@@ -80,7 +85,7 @@ class MMBody(QMainWindow):
         #
         # Конфигурация кнопок
 
-        self.ui.pushbutton_open_folder.pressed.connect(self.open_folder)
+
         # self.ui.nextPageButton.pressed.connect(self.next_page)
         # self.ui.previousPageButton.pressed.connect(self.previous_page)
         # self.ui.pushButton_save_settings.pressed.connect(self.save_settings)
@@ -419,15 +424,17 @@ class MMBody(QMainWindow):
 
                 local_vertical_layout = QVBoxLayout(back_widget)
 
-                label = QLabel()
-                label.setMaximumSize(700,500)
-                shadow = QGraphicsDropShadowEffect()
-                shadow.setBlurRadius(20)
-                shadow.setYOffset(0)
-                shadow.setXOffset(0)
-                label.setGraphicsEffect(shadow)
-                pixmap = QPixmap(self.paths_to_all_files_list[pressed_button_index]).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
-                label.setPixmap(pixmap)
+                label = ScaledLabel()
+                label.setMaximumSize(700, 500)
+                # shadow = QGraphicsDropShadowEffect()
+                # shadow.setBlurRadius(20)
+                # shadow.setYOffset(0)
+                # shadow.setXOffset(0)
+                # label.setGraphicsEffect(shadow)
+                # pixmap = QPixmap(self.paths_to_all_files_list[pressed_button_index]).scaled(
+                #         600, 400, aspectRatioMode=Qt.KeepAspectRatio, transformMode=Qt.FastTransformation)
+                # label.setPixmap(pixmap)
+                # self.label_animation_init(label)
                 self.right_window_label = label
 
                 spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -441,14 +448,14 @@ class MMBody(QMainWindow):
 
                 left_arrow = QPushButton()
                 left_arrow.setText('<<')
-                left_arrow.setMinimumSize(65,25)
+                left_arrow.setMinimumSize(65, 25)
                 self.left_arrow = left_arrow
                 self.pushbutton_style_creator(left_arrow)
                 left_arrow.pressed.connect(lambda: self.arrow_button_pressed('left'))
 
                 right_arrow = QPushButton()
                 right_arrow.setText('>>')
-                right_arrow.setMinimumSize(65,25)
+                right_arrow.setMinimumSize(65, 25)
                 self.right_arrow = right_arrow
                 self.pushbutton_style_creator(right_arrow)
                 right_arrow.pressed.connect(lambda: self.arrow_button_pressed('right'))
@@ -471,6 +478,20 @@ class MMBody(QMainWindow):
 
             self.right_window_is_open = True
             self.button_cancel_selection.setEnabled(True)
+
+
+    def label_animation_init(self, label):
+        # opacity_effect = QGraphicsOpacityEffect(label)
+        # label.setGraphicsEffect(opacity_effect)
+
+        geometry_animation = QPropertyAnimation(label,
+                                                b"geometry",
+                                                duration=4700,
+                                                startValue=QRect(0, 0, 0, 0),
+                                                endValue=QRect(0, 0, 600, 400))
+
+        self.animation_group.addAnimation(geometry_animation)
+        self.animation_group.start()
 
 
     def right_window_changing(self, pressed_button_index: int) -> None:
@@ -564,7 +585,6 @@ class MMBody(QMainWindow):
         # Указание конца промежутка
         elif self.second_pressed_index == -1:
             self.second_pressed_index = pressed_button_index
-
             # Если изначально был выбран конец промежутка, а не начало
             if self.first_pressed_index > self.second_pressed_index:
                 self.first_pressed_index, self.second_pressed_index = self.second_pressed_index, self.first_pressed_index
@@ -590,7 +610,6 @@ class MMBody(QMainWindow):
                             "QPushButton::pressed {background-color: #dadada;}")
 
                 self.first_pressed_index = pressed_button_index
-
             # Изменение конца промежутка
             elif pressed_button_index > self.second_pressed_index:
                 for i in range(self.second_pressed_index + 1, pressed_button_index + 1):
@@ -600,7 +619,6 @@ class MMBody(QMainWindow):
                         "QPushButton::pressed {background-color: #dadada;}")
 
                 self.second_pressed_index = pressed_button_index
-
             # Обрезание промежутка (выбрана кнопка из диапазона)
             elif pressed_button_index > self.first_pressed_index and pressed_button_index < self.second_pressed_index:
                 # Обрезаем начало (расстояние от начала до выбранного индекса наименьшее)
@@ -660,7 +678,7 @@ class MMBody(QMainWindow):
             return
 
 
-    def arrow_button_pressed(self, side : str):
+    def arrow_button_pressed(self, side: str):
         '''
         Функция перелистывания медиафайлов в right_block 
 
@@ -840,23 +858,169 @@ class MMBody(QMainWindow):
                     self.layout_cleaner(item.layout())
 
 
+    def keyPressEvent(self, e) -> None:
+        # Главное окно с медиафайлами
+        if self.ui.tabWidget.currentIndex() == 0:
+            if e.key() == Qt.Key_Return:
+                self.add_tag(-1)
+
+
+    @staticmethod
+    def db_init() -> None:
+        """
+        Функция инициализирует базу данных при запуске программы
+        """
+        if platform.startswith("win"):
+            with sqlite3.connect("winDataBase.db") as db:
+                cursor = db.cursor()
+                cursor.execute(""" CREATE TABLE IF NOT EXISTS media_files (disk_name TEXT, file_id TEXT, tags TEXT) """)
+                db.commit()
+
+        elif platform == "darwin" or platform.startswith("linux"):
+            with sqlite3.connect("linDataBase.db") as db:
+                cursor = db.cursor()
+                cursor.execute(""" CREATE TABLE IF NOT EXISTS media_files (device_id TEXT, file_id TEXT, tags TEXT) """)
+                db.commit()
+
+        else:
+            sys.exit("The platform is not supported")
+
+
+    def window_resize(self, type_: str) -> None:
+        """
+        Функция автоматического изменения размера окна
+
+        :param type_: Переменная, отвечающая за вид изменения размера
+        """
+        tab_index = self.ui.tabWidget.currentIndex()
+        # Первый запуск программы
+        if type_ == 'start':
+            self.animation = QPropertyAnimation(self, b"size")
+            self.animation.setDuration(500)
+            self.animation.setEasingCurve(QEasingCurve.Linear)
+            self.animation.setStartValue(QSize(20, 20))
+            self.animation.setEndValue(QSize(500, 540))
+            self.animation.start()
+        # Переключение между вкладками программы
+        elif type_ == "change":
+            # Проверка на несохраненные значения в окне настроек  
+            if self.LastIndex == 1 and self.ui.pushButton_save_settings.isEnabled():
+                error_message = QMessageBox()
+                error_message.setWindowTitle('Изменение настроек')
+                error_message.setWindowIcon(QIcon('icons/save_or_not.png'))
+                error_message.setText("Вы хотите сохранить изменения?      ")
+                error_message.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+
+                result = error_message.exec_()
+
+                if result == QMessageBox.Yes:
+                    self.save_settings()
+                else:
+                    self.ui.settings_init() #### Проверить!!!
+
+        elif type_ == "left_window_opening": # Добавить зависимость от кол-ва фотографий в папке
+            self.move_window(((application.size().width() - 600) // 2,
+                              (application.size().height() - 700) // 2), (600, 700), "left_window_opening")
+
+        elif type_ == "right_window_opening":
+            self.move_window(((application.size().width() - 1250) // 2,
+                              (application.size().height() - 730) // 2), (1250, 730), "right_window_opening")
+
+        self.LastIndex = tab_index
+
+
+    def move_window(self, xy_shift: tuple, new_size: tuple, type_: str) -> None:
+        """
+        Функция изменяет размер окна и одновременно перемещает его
+        для избежания выхода за границы экрана.
+
+        :param xy_shift: Кортеж со значениями, на которые нужно переместить окно.
+        :param new_size: Кортеж с новым размером окна.
+        :param type_: Строка, содержащая тип анимации.
+        """
+        new_coordinates = (application.geometry().x() + xy_shift[0],
+                           application.geometry().y() + xy_shift[1])
+
+        self.move_animation = QPropertyAnimation(self, b"geometry")
+        self.move_animation.setDuration(1125)
+        self.move_animation.setEasingCurve(QEasingCurve.OutCirc)
+        self.move_animation.setStartValue(application.geometry())
+        self.move_animation.setEndValue(QRect(new_coordinates[0], new_coordinates[1],
+                                              new_size[0], new_size[1]))
+
+        if type_ == "left_window_opening":
+            self.move_animation.start()
+
+        elif type_ == "right_window_opening":
+            self.move_animation.start()
+            # self.animation_group = QParallelAnimationGroup()
+            # self.animation_group.addAnimation(self.move_animation)
+
+
+    def pushbutton_style_creator(self, pushbutton: object) -> None:
+        pushbutton.setStyleSheet("QPushButton {background-color: #c7c7c7; border-radius: 7px; border: 1px solid #8a8a8a}"
+                                                "QPushButton::hover {background-color: #dedede;}"
+                                                "QPushButton::pressed {background-color: #dadada;}")
+        self.set_shadow_effect(pushbutton)
+
+
+    @staticmethod
+    def set_shadow_effect(object_: object) -> None:
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(4)
+        shadow.setXOffset(0)
+        shadow.setYOffset(0)
+
+        object_.setGraphicsEffect(shadow)
+
+# Установка иконки приложения
+try:
+    from PyQt5.QtWinExtras import QtWin
+    myAppId = 'mycompany.myproduct.subproduct.version'
+    QtWin.setCurrentProcessExplicitAppUserModelID(myAppId)
+except ImportError:
+    pass
+
+
+if __name__ == '__main__':
+    monitor_size = ()
+
+    for monitor in get_monitors():
+        if monitor.is_primary:
+            monitor_size = (monitor.width, monitor.height)
+    # Не найден ни один монитор
+    if len(monitor_size) == 0:
+        raise OSError
+
+    app = QApplication([])
+    app.setWindowIcon(QIcon("icons/WindowIcon.icns"))
+    app.setStyle(QStyleFactory.keys()[-1])
+    application = MMBody()
+    application.move(monitor_size[0] // 2 - 250, monitor_size[1] // 2 - 270)
+    application.setWindowIcon(QIcon("icons/WindowIcon.icns"))
+    application.show()
+    sys.exit(app.exec_())
+
+
+
+
+
+
     # def ToolTip_enable(self, duration = 1):
-        # if self.ui.checkBox_setting1.isChecked():
-        #     duration = 5000
-        #
-        # for button in self.ui.pushButton_input_mass:
-        #     button.setToolTipDuration(duration)
-        # for button in self.ui.pushButton_category_delete_mass:
-        #     button.setToolTipDuration(duration)
-        # for button in self.ui.pushButton_categories_color_mass:
-        #     button.setToolTipDuration(duration)
-        # for button in self.ui.pushButton_category_change_priority_mass:
-        #     button.setToolTipDuration(duration)
-        # self.ui.pushButton_addcategory.setToolTipDuration(duration)
-        # self.ui.listWidget_history_tags.setToolTipDuration(duration)
-        # self.ui.pushButton_deletecategory.setToolTipDuration(duration)
-
-
+    # if self.ui.checkBox_setting1.isChecked():
+    #     duration = 5000
+    #
+    # for button in self.ui.pushButton_input_mass:
+    #     button.setToolTipDuration(duration)
+    # for button in self.ui.pushButton_category_delete_mass:
+    #     button.setToolTipDuration(duration)
+    # for button in self.ui.pushButton_categories_color_mass:
+    #     button.setToolTipDuration(duration)
+    # for button in self.ui.pushButton_category_change_priority_mass:
+    #     button.setToolTipDuration(duration)
+    # self.ui.pushButton_addcategory.setToolTipDuration(duration)
+    # self.ui.listWidget_history_tags.setToolTipDuration(duration)
+    # self.ui.pushButton_deletecategory.setToolTipDuration(duration)
 
     # Добавление тегов
     # def add_tags(self, called_by):
@@ -958,7 +1122,6 @@ class MMBody(QMainWindow):
     #
     #
     #                 self.ui.lineEdit_tags_mass[i].clear()
-
 
     # # Удаление тегов
     # def delete_tags(self, called_by, _lw_count_flag=True):
@@ -1072,8 +1235,6 @@ class MMBody(QMainWindow):
     #     if mass == self.ui.categories_mass:  # Все исходные категории сохранились
     #         self.ui.pushButton_save_changes.setEnabled(False)
     #         self.ui.pushButton_cancel_changes.setEnabled(False)
-
-
 
     # # Удаление категорий на странице "Категории тегов"
     # def delete_category(self): #flag = False
@@ -1629,27 +1790,6 @@ class MMBody(QMainWindow):
     #
 
 
-    def keyPressEvent(self, e) -> None:
-        # Главное окно с медиафайлами
-        if self.ui.tabWidget.currentIndex() == 0:
-            if e.key() == Qt.Key_Return:
-                self.add_tag(-1)
-
-            # elif (e.key() == QtCore.Qt.Key_L or e.key() == 1044) and self.ui.pushButton_load.isEnabled():
-            #     self.load_files()
-            #
-            # elif (e.key() == QtCore.Qt.Key_O or e.key() == 1065) and self.ui.pushButton_open.isEnabled():
-            #     self.open_files()
-            #
-            # elif (e.key() == QtCore.Qt.Key_D or e.key() == 1042) and self.ui.pushButton_delete_files.isEnabled():
-            #     self.PushButton_delete_files()
-
-
-        # elif self.ui.tabWidget.currentIndex() == 2: # Таб с категориями
-        #     if e.key() == QtCore.Qt.Key_Return:
-        #         self.add_category()
-
-
     #
     # def eventFilter(self, obj, event):
     #     if obj == self.ui.pushButton_deletecategory:
@@ -1841,132 +1981,3 @@ class MMBody(QMainWindow):
     #         self.ui.pushButton_category_change_priority_mass[i].setEnabled(False)
     #
     #     self.PushButtons_return_StyleSheet()
-
-
-    @staticmethod
-    def db_init() -> None:
-        """
-        Функция инициализирует базу данных при запуске программы
-        """
-        if platform.startswith("win"):
-            with sqlite3.connect("winDataBase.db") as db:
-                cursor = db.cursor()
-                cursor.execute(""" CREATE TABLE IF NOT EXISTS media_files (disk_name TEXT, file_id TEXT, tags TEXT) """)
-                db.commit()
-
-        elif platform == "darwin" or platform.startswith("linux"):
-            with sqlite3.connect("linDataBase.db") as db:
-                cursor = db.cursor()
-                cursor.execute(""" CREATE TABLE IF NOT EXISTS media_files (device_id TEXT, file_id TEXT, tags TEXT) """)
-                db.commit()
-
-        else:
-            sys.exit("The platform is not supported")
-
-
-    def window_resize(self, type_: str) -> None:
-        """
-        Функция автоматического изменения размера окна
-
-        :param type_: Переменная, отвечающая за вид изменения размера
-        """
-        tab_index = self.ui.tabWidget.currentIndex()
-        # Первый запуск программы
-        if type_ == 'start':
-            self.animation = QPropertyAnimation(self, b"size")
-            self.animation.setDuration(500)
-            self.animation.setEasingCurve(QEasingCurve.Linear)
-            self.animation.setStartValue(QSize(20, 20))
-            self.animation.setEndValue(QSize(500, 540))
-            self.animation.start()
-        # Переключение между вкладками программы
-        elif type_ == "change":
-            # Проверка на несохраненные значения в окне настроек  
-            if self.LastIndex == 1 and self.ui.pushButton_save_settings.isEnabled():
-                error_message = QMessageBox()
-                error_message.setWindowTitle('Изменение настроек')
-                error_message.setWindowIcon(QIcon('icons/save_or_not.png'))
-                error_message.setText("Вы хотите сохранить изменения?      ")
-                error_message.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-
-                result = error_message.exec_()
-
-                if result == QMessageBox.Yes:
-                    self.save_settings()
-                else:
-                    self.ui.settings_init() #### Проверить!!!
-
-        elif type_ == 'left_window_opening': # Добавить зависимость от кол-ва фотографий в папке
-            self.move_window(((application.size().width() - 600) // 2,
-                              (application.size().height() - 700) // 2), (600, 700))
-
-        elif type_ == 'right_window_opening':
-            self.move_window(((application.size().width() - 1250) // 2,
-                              (application.size().height() - 730) // 2), (1250, 730))
-
-        self.LastIndex = tab_index
-
-
-    def move_window(self, xy_shift: tuple, new_size: tuple) -> None:
-        """
-        Функция изменяет размер окна и одновременно перемещает его
-        для избежания выхода за границы экрана.
-
-        :param xy_shift: Кортеж со значениями, на которые нужно переместить окно.
-        :param new_size: Кортеж с новым размером окна.
-        """
-        new_coordinates = (application.geometry().x() + xy_shift[0],
-                           application.geometry().y() + xy_shift[1])
-
-        self.move_animation = QPropertyAnimation(self, b"geometry")
-        self.move_animation.setDuration(1125)
-        self.move_animation.setEasingCurve(QEasingCurve.OutCirc)
-        self.move_animation.setStartValue(application.geometry())
-        self.move_animation.setEndValue(QRect(new_coordinates[0], new_coordinates[1],
-                                              new_size[0], new_size[1]))
-        self.move_animation.start()
-
-
-    def pushbutton_style_creator(self, pushbutton: object) -> None:
-        pushbutton.setStyleSheet("QPushButton {background-color: #c7c7c7; border-radius: 7px; border: 1px solid #8a8a8a}"
-                                                "QPushButton::hover {background-color: #dedede;}"
-                                                "QPushButton::pressed {background-color: #dadada;}")
-        self.set_shadow_effect(pushbutton)
-
-
-    @staticmethod
-    def set_shadow_effect(object_: object) -> None:
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(4)
-        shadow.setXOffset(0)
-        shadow.setYOffset(0)
-
-        object_.setGraphicsEffect(shadow)
-
-# Установка иконки приложения
-try:
-    from PyQt5.QtWinExtras import QtWin
-    myAppId = 'mycompany.myproduct.subproduct.version'
-    QtWin.setCurrentProcessExplicitAppUserModelID(myAppId)
-except ImportError:
-    pass
-
-
-if __name__ == '__main__':
-    monitor_size = ()
-
-    for monitor in get_monitors():
-        if monitor.is_primary:
-            monitor_size = (monitor.width, monitor.height)
-    # Не найден ни один монитор
-    if len(monitor_size) == 0:
-        raise OSError
-
-    app = QApplication([])
-    app.setWindowIcon(QIcon("icons/WindowIcon.icns"))
-    app.setStyle(QStyleFactory.keys()[-1])
-    application = MMBody()
-    application.move(monitor_size[0] // 2 - 250, monitor_size[1] // 2 - 270)
-    application.setWindowIcon(QIcon("icons/WindowIcon.icns"))
-    application.show()
-    sys.exit(app.exec_())

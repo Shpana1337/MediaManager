@@ -132,7 +132,6 @@ class Ui_MainWindow(object):
         self.verticalLayout_3.setObjectName("verticalLayout_3")
 
 
-
         # _folder = Path('\Mac\Home\Desktop\МедиаМенеджер\Текущая версия\МедиаМенеджер\фотографии 2')
         # picture_types = {'jpeg','png','jpg'}
         # self.picture_mass = []
@@ -152,6 +151,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_Main = QtWidgets.QVBoxLayout(self.Main)
         self.verticalLayout_Main.setObjectName("horizontalLayout_13")
         self.scrollArea = QtWidgets.QScrollArea(self.Main)
+        self.scrollArea.horizontalScrollBar().setStyleSheet("QScrollBar {width: 0px; height: 0px;}")
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName("scrollArea")
         self.scrollAreaWidgetContents = QtWidgets.QWidget()
