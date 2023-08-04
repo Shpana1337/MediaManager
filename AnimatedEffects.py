@@ -8,13 +8,18 @@ class AnimatedShadowEffect(QGraphicsDropShadowEffect):
         self.blur_radius = 0
         self.animation = QPropertyAnimation(self)
         self.animation.setTargetObject(self)
-        self.animation.setDuration(700)
         self.animation.setPropertyName(b"radius")
+
+    def rise_animation_start(self):
         self.animation.setStartValue(0)
         self.animation.setEndValue(100)
+        self.animation.start()
 
-    def animation_start(self):
-        self.animation.start(QPropertyAnimation.DeleteWhenStopped)
+
+    def fading_animation_start(self):
+        self.animation.setStartValue(100)
+        self.animation.setEndValue(0)
+        self.animation.start()
 
 
     @pyqtProperty(int)

@@ -66,6 +66,7 @@ class MMBody(QMainWindow):
         self.previous_elements_mass = []
         self.selected_files_way_mass = []
         self.paths_to_all_files_list = []
+        self.shadow_effect = AnimatedShadowEffect()
         self.changed_tags_indexes_list = set()
         self.first_frame_folder = Path('icons_cache')
         self.right_window_is_open = False
@@ -673,8 +674,7 @@ class MMBody(QMainWindow):
                 self.selected_files_way_mass = [self.paths_to_all_files_list[self.previous_button_index - 1]]
                 self.previous_button_index -= 1
 
-                pixmap = QPixmap(icon_way).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
-                self.right_window_label.setPixmap(pixmap)
+                self.animated_pixmap_change_1(icon_way, duration=100)
 
                 if self.previous_button_index == 0:
                     self.left_arrow.setEnabled(False)
@@ -698,14 +698,54 @@ class MMBody(QMainWindow):
                 icon_way = self.paths_to_all_files_list[self.previous_button_index + 1]
                 self.previous_button_index += 1
 
-                pixmap = QPixmap(icon_way).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
-                self.right_window_label.setPixmap(pixmap)
+                self.animated_pixmap_change_1(icon_way, duration=100)
 
                 if self.previous_button_index == len(self.photo_button_mass) - 1:
                     self.right_arrow.setEnabled(False)
 
                 if not(self.left_arrow.isEnabled()):
                     self.left_arrow.setEnabled(True)
+
+
+    def animated_pixmap_change_1(self, icon_way: str, duration: int) -> None:
+        self.shadow_effect.animation.setDuration(duration)
+        self.shadow_effect.fading_animation_start()
+        self.shadow_effect.animation.finished.connect(lambda: self.animated_pixmap_change_2(icon_way,
+                                                                                            values=(1, 0),
+                                                                                            duration=duration))
+
+
+    def animated_pixmap_change_2(self, icon_way: str, values: tuple, duration: int) -> None:
+        opacity_effect = QGraphicsOpacityEffect(self.right_window_label)
+        self.right_window_label.setGraphicsEffect(opacity_effect)
+        self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
+        self.opacity_animation.setDuration(duration)
+        self.opacity_animation.setStartValue(values[0])
+        self.opacity_animation.setEndValue(values[1])
+        self.opacity_animation.start()
+        # Функция вызвана от animated_pixmap_changing_1
+        if values[0] == 1:
+            self.opacity_animation.finished.connect(lambda: self.animated_pixmap_change_3(icon_way,
+                                                                                          duration=duration))
+        # Функция вызвана от animated_pixmap_changing_3
+        else:
+            self.opacity_animation.finished.connect(lambda: self.animated_pixmap_change_4(duration=duration))
+
+
+    def animated_pixmap_change_3(self, icon_way: str, duration: int) -> None:
+        pixmap = QPixmap(icon_way).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
+        self.right_window_label.setPixmap(pixmap)
+        self.animated_pixmap_change_2(icon_way, values=(0, 1), duration=duration)
+
+
+    def animated_pixmap_change_4(self, duration: int) -> None:
+        self.shadow_effect = AnimatedShadowEffect()
+        self.shadow_effect.animation.setDuration(duration)
+        self.shadow_effect.setXOffset(0)
+        self.shadow_effect.setYOffset(0)
+        self.right_window_label.setGraphicsEffect(self.shadow_effect)
+
+        self.shadow_effect.rise_animation_start()
 
 
     def add_tag(self, index_: int) -> None:
@@ -920,10 +960,10 @@ class MMBody(QMainWindow):
                                               new_size[0], new_size[1]))
 
         if type_ == "left_window_opening":
-            self.move_animation.start(QPropertyAnimation.DeleteWhenStopped)
+            self.move_animation.start()
 
         elif type_ == "right_window_opening":
-            self.move_animation.start(QPropertyAnimation.DeleteWhenStopped)
+            self.move_animation.start()
             self.move_animation.finished.connect(self.pixmap_creation)
 
 
@@ -941,20 +981,20 @@ class MMBody(QMainWindow):
         self.right_window_label.setGraphicsEffect(opacity_effect)
         self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
         self.opacity_animation.setDuration(700)
-        self.opacity_animation.setStartValue(0.0)
-        self.opacity_animation.setEndValue(1.0)
-        self.opacity_animation.start(QPropertyAnimation.DeleteWhenStopped)
-        self.opacity_animation.finished.connect(self.label_shadow_effect)
+        self.opacity_animation.setStartValue(0)
+        self.opacity_animation.setEndValue(1)
+        self.opacity_animation.start()
+        self.opacity_animation.finished.connect(self.label_shadow_effect_init)
 
 
-    def label_shadow_effect(self):
-        shadow = AnimatedShadowEffect()
-        shadow.setBlurRadius(50)
-        shadow.setYOffset(0)
-        shadow.setXOffset(0)
+    def label_shadow_effect_init(self):
+        self.shadow_effect = AnimatedShadowEffect()
+        self.shadow_effect.setYOffset(0)
+        self.shadow_effect.setXOffset(0)
+        self.shadow_effect.animation.setDuration(700)
 
-        self.right_window_label.setGraphicsEffect(shadow)
-        shadow.animation_start()
+        self.right_window_label.setGraphicsEffect(self.shadow_effect)
+        self.shadow_effect.rise_animation_start()
 
 
     def pushbutton_style_creator(self, pushbutton: QWidget) -> None:
