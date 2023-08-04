@@ -19,19 +19,18 @@ from collections import Counter
 
 import PyQt5.QtMultimediaWidgets
 from screeninfo import get_monitors
-from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPaintEvent
+from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPaintEvent, QColor
 from moviepy.editor import VideoFileClip
 from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QPoint, QRect, \
-                        QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup
+                        QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup, QAbstractAnimation
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
     QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
     QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, QGraphicsOpacityEffect
 
 from ui import Ui_MainWindow
-from ScaledWidgets import ScaledLabel
-
+from AnimatedEffects import AnimatedShadowEffect
 
 class MMBody(QMainWindow):
     def __init__(self):
@@ -42,9 +41,17 @@ class MMBody(QMainWindow):
 
         #self.levels = 0
         #self.LastIndex = 0
+        self.animation = None
+        self.LastIndex = None
+        self.left_arrow = None
+        self.right_arrow = None
+        self.save_button = None
+        self.cancel_button = None
         self.move_animation = None
-        self.animation_group = None
+        self.opacity_animation = None
         self.right_window_label = None
+        self.pressed_button_index = None
+        self.button_cancel_selection = None
         self.selection_type = 1
         self.first_pressed_index = -1
         self.second_pressed_index = -1
@@ -60,10 +67,11 @@ class MMBody(QMainWindow):
         self.selected_files_way_mass = []
         self.paths_to_all_files_list = []
         self.changed_tags_indexes_list = set()
-        self.frame_folder = Path('icons_cache')
+        self.first_frame_folder = Path('icons_cache')
         self.right_window_is_open = False
 
-        self.button_stylesheet_settings = "QPushButton {background-color: #c7c7c7; border-radius: 7px; border: 1px solid #8a8a8a} " \
+        self.button_stylesheet_settings = "QPushButton {background-color: #c7c7c7; " \
+                                          "border-radius: 7px; border: 1px solid #8a8a8a} " \
                                           "QPushButton::hover {background-color: #dedede; " \
                                           "QPushButton::pressed {background-color: #dadada;} " \
                                           "QToolTip {border: 1px solid black; background-color: white}"
@@ -98,10 +106,7 @@ class MMBody(QMainWindow):
 
 
     def open_folder(self) -> None:
-        """
-        :param self.frame_folder: Папка, в которую сохраняется первый кадр видео для создания иконки
-        """
-        for file in self.frame_folder.iterdir():
+        for file in self.first_frame_folder.iterdir():
             remove(file)
 
         dirlist = QFileDialog.getExistingDirectory(self, "Выбрать папку", ".")
@@ -150,35 +155,15 @@ class MMBody(QMainWindow):
         #     self.cancel_button.setEnabled(True)
 
 
-    def tags_splitting(self, file_way: str) -> list: # Нужно удалить эту функцию
-        """
-        :return: Возвращаем массив с тегами, созданными по имени файла
-        """
-        # Удаление пути файла, оставляем только поле с тегами
-        file_way = file_way.split('{')
-        file_way = file_way[-1]
-
-        # Удаление формата файла в конце строки
-        file_way = file_way.split('.')
-        file_way = file_way[0]
-
-        tags_mass = file_way.split(',')
-
-        for i in range(len(tags_mass)):
-            tags_mass[i] = tags_mass[i].strip()
-
-        return tags_mass
-
-
     def block_creator(self, file_way: str, file_is_photo: bool) -> None:
         """
-        Функция создает блоки медиафайлами, тегами и кнопками
+        Функция создает блоки с медиафайлами, тегами и кнопками.
 
-        :param ui.verticalLayout_11: Лэйаут скрол виджета
-        :param horizontal_layout: Главный лэйаут блока
-        :param vertical_layout: Правый лэйаут блока с лист виджетом и лэайутом с кнопками
-        :param file_way: Путь к медиафайлу
-        :param file_is_photo: Булева переменная, показывает является ли файл фотографией
+        :param ui.verticalLayout_11: Лэйаут scroll виджета.
+        :param horizontal_layout: Главный layout блока.
+        :param vertical_layout: Правый лэйаут блока с list widget и layout с кнопками.
+        :param file_way: Путь к медиафайлу.
+        :param file_is_photo: Булева переменная, показывает является ли файл фотографией.
         """
         # Сборка главного лэйаута блока
         horizontal_layout = QHBoxLayout()
@@ -192,9 +177,9 @@ class MMBody(QMainWindow):
         else:
             # Сохраняем первый кадр видео для иконки в кнопку
             video = VideoFileClip(file_way)
-            video.save_frame(f'{self.frame_folder}/{len(self.photo_button_mass)}.png', t = 1)
+            video.save_frame(f'{self.first_frame_folder}/{len(self.photo_button_mass)}.png', t=1)
 
-            icon = f'{self.frame_folder}/{len(self.photo_button_mass)}.png'
+            icon = f'{self.first_frame_folder}/{len(self.photo_button_mass)}.png'
             self.button_is_photo_mass.append(False)
 
             # video_item = QGraphicsVideoItem()
@@ -219,8 +204,8 @@ class MMBody(QMainWindow):
         button_photo.setIcon(QIcon(icon))
         button_photo.setIconSize(QSize(220, 160))
         button_photo.setStyleSheet("QPushButton {background-color: white;border-radius: 7px; border: 1px solid #8a8a8a}"
-                                                "QPushButton::hover {background-color: #eaeaea;}"
-                                                "QPushButton::pressed {background-color: #dadada;}")
+                                   "QPushButton::hover {background-color: #eaeaea;}"
+                                   "QPushButton::pressed {background-color: #dadada;}")
         self.set_shadow_effect(button_photo)
 
         horizontal_layout.addWidget(button_photo)
@@ -285,7 +270,7 @@ class MMBody(QMainWindow):
         Функция добавляет ко всем файлам теги, если они были ранее загружены в базу данных.
         Вызывается только после открытия папки с медиафайлами.
 
-        :param all_files_paths: Массив, содержащий все директории файлов
+        :param all_files_paths: Массив, содержащий все директории файлов.
         """
         if platform.startswith("win"):
             db_name = "winDataBase.db"
@@ -309,7 +294,9 @@ class MMBody(QMainWindow):
 
     def selection_type_change(self, value: int) -> None:
         """
-        Функция меняет вид выделения файлов
+        Функция меняет вид выделения файлов.
+
+        :param value: Индекс выбранного метода выделения.
         """
         self.selection_type = value + 1
         self.right_block_cleaner()
@@ -317,7 +304,7 @@ class MMBody(QMainWindow):
 
     def upper_lower_layouts_creating(self) -> None:
         """
-        Функция создает главное окно, в котором отображаются медиафайлы при открытии папки
+        Функция создает главное окно, в котором отображаются медиафайлы при открытии папки.
         """
         # Верхний лэйаут
         combo_box = QComboBox()
@@ -410,68 +397,14 @@ class MMBody(QMainWindow):
         """
         Функция создает расширенное главное окно с увеличенными медиафайлами.
 
-        :param pressed_button_index: Индекс нажатого медиафайла
+        :param pressed_button_index: Индекс нажатого медиафайла.
         """
         if self.right_block_create_test(pressed_button_index):
             print(f'Ready to create a block! Selection_type = {self.selection_type}')
             self.window_resize('right_window_opening')
             # Создание блока с фотографией
             if self.button_is_photo_mass[pressed_button_index]:
-                back_widget = QWidget()
-                # back_widget.setMinimumSize(600, 600)
-                back_widget.setMaximumSize(600, 700)
-                back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
-
-                local_vertical_layout = QVBoxLayout(back_widget)
-
-                label = ScaledLabel()
-                label.setMaximumSize(700, 500)
-                # shadow = QGraphicsDropShadowEffect()
-                # shadow.setBlurRadius(20)
-                # shadow.setYOffset(0)
-                # shadow.setXOffset(0)
-                # label.setGraphicsEffect(shadow)
-                # pixmap = QPixmap(self.paths_to_all_files_list[pressed_button_index]).scaled(
-                #         600, 400, aspectRatioMode=Qt.KeepAspectRatio, transformMode=Qt.FastTransformation)
-                # label.setPixmap(pixmap)
-                # self.label_animation_init(label)
-                self.right_window_label = label
-
-                spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-                local_vertical_layout.addItem(spacer)
-                local_vertical_layout.addWidget(label)
-
-                spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-                local_vertical_layout.addItem(spacer)
-
-                horizontal_buttons_layout = QHBoxLayout()
-
-                left_arrow = QPushButton()
-                left_arrow.setText('<<')
-                left_arrow.setMinimumSize(65, 25)
-                self.left_arrow = left_arrow
-                self.pushbutton_style_creator(left_arrow)
-                left_arrow.pressed.connect(lambda: self.arrow_button_pressed('left'))
-
-                right_arrow = QPushButton()
-                right_arrow.setText('>>')
-                right_arrow.setMinimumSize(65, 25)
-                self.right_arrow = right_arrow
-                self.pushbutton_style_creator(right_arrow)
-                right_arrow.pressed.connect(lambda: self.arrow_button_pressed('right'))
-
-                self.previous_button_index = pressed_button_index
-
-                if pressed_button_index == 0:
-                    left_arrow.setEnabled(False)
-
-                elif pressed_button_index == len(self.photo_button_mass) - 1:
-                    right_arrow.setEnabled(False)
-
-                horizontal_buttons_layout.addWidget(left_arrow)
-                horizontal_buttons_layout.addWidget(right_arrow)
-                local_vertical_layout.addLayout(horizontal_buttons_layout)
-                self.ui.verticalLayout_right_window.addWidget(back_widget)
+                self.photo_block_creating(pressed_button_index)
             # Создание блока с видео
             else:
                 pass
@@ -480,31 +413,69 @@ class MMBody(QMainWindow):
             self.button_cancel_selection.setEnabled(True)
 
 
-    def label_animation_init(self, label):
-        # opacity_effect = QGraphicsOpacityEffect(label)
-        # label.setGraphicsEffect(opacity_effect)
+    def photo_block_creating(self, pressed_button_index: int) -> None:
+        back_widget = QWidget()
+        back_widget.setMaximumSize(600, 700)
+        back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
 
-        geometry_animation = QPropertyAnimation(label,
-                                                b"geometry",
-                                                duration=4700,
-                                                startValue=QRect(0, 0, 0, 0),
-                                                endValue=QRect(0, 0, 600, 400))
+        local_vertical_layout = QVBoxLayout(back_widget)
 
-        self.animation_group.addAnimation(geometry_animation)
-        self.animation_group.start()
+        label = QLabel()
+        label.setText("")
+        label.setAlignment(Qt.AlignCenter)
+        label.setStyleSheet("QLabel {border: 0px solid black;}")
+        label.setMaximumSize(700, 500)
+        self.right_window_label = label
+        self.pressed_button_index = pressed_button_index
+
+        spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        local_vertical_layout.addItem(spacer)
+        local_vertical_layout.addWidget(label)
+
+        spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        local_vertical_layout.addItem(spacer)
+
+        horizontal_buttons_layout = QHBoxLayout()
+
+        left_arrow = QPushButton()
+        left_arrow.setText('<<')
+        left_arrow.setMinimumSize(65, 25)
+        self.left_arrow = left_arrow
+        self.pushbutton_style_creator(left_arrow)
+        left_arrow.pressed.connect(lambda: self.arrow_button_pressing('left'))
+
+        right_arrow = QPushButton()
+        right_arrow.setText('>>')
+        right_arrow.setMinimumSize(65, 25)
+        self.right_arrow = right_arrow
+        self.pushbutton_style_creator(right_arrow)
+        right_arrow.pressed.connect(lambda: self.arrow_button_pressing('right'))
+
+        self.previous_button_index = pressed_button_index
+
+        if pressed_button_index == 0:
+            left_arrow.setEnabled(False)
+
+        elif pressed_button_index == len(self.photo_button_mass) - 1:
+            right_arrow.setEnabled(False)
+
+        horizontal_buttons_layout.addWidget(left_arrow)
+        horizontal_buttons_layout.addWidget(right_arrow)
+        local_vertical_layout.addLayout(horizontal_buttons_layout)
+        self.ui.verticalLayout_right_window.addWidget(back_widget)
 
 
     def right_window_changing(self, pressed_button_index: int) -> None:
-        '''
-        :param self.previous_button_index: индекс предпоследней нажатой кнопки
-        :param selection_type: способ выделения фотографий (1 - одиночное, 2 - от и до, 3 - выборочное)
-        :param selected_photo_mass: массив с указателями на кнопки выбранных фотографий
+        """
+        :param self.previous_button_index: индекс предпоследней нажатой кнопки.
+        :param selection_type: способ выделения фотографий (1 - одиночное, 2 - от и до, 3 - выборочное).
+        :param selected_photo_mass: массив с указателями на кнопки выбранных фотографий.
         :param ready_to_create_block: флаг = True, когда выполнятся все условия для открытия блока
-                                      для одного из вариантов выделения
-        :param pressed_button_index: Индекс нажатой кнопки
-        :param first_pressed_index: индекс первого нажатого элемента
-        :param second_pressed_index: индекс второго нажатого элемента
-        '''
+                                      для одного из вариантов выделения.
+        :param pressed_button_index: Индекс нажатой кнопки.
+        :param first_pressed_index: индекс первого нажатого элемента.
+        :param second_pressed_index: индекс второго нажатого элемента.
+        """
 
         if not(self.right_window_is_open):
             self.right_window_creating(pressed_button_index)
@@ -554,7 +525,7 @@ class MMBody(QMainWindow):
 
     def right_block_create_test(self, pressed_button_index: int):
         """
-        Функция проверяет, выполнены ли все условия для создания расширенного окна с медиафайлами
+        Функция проверяет, выполнены ли все условия для создания расширенного окна с медиафайлами.
         """
         # Одиночное выделение
         if self.selection_type == 1:
@@ -579,9 +550,9 @@ class MMBody(QMainWindow):
         if self.first_pressed_index == -1:
             self.first_pressed_index = pressed_button_index
             self.photo_button_mass[pressed_button_index].setStyleSheet(
-                    "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
-                    "QPushButton::hover {background-color: #dedede;}"
-                    "QPushButton::pressed {background-color: #dadada;}")
+                "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
+                "QPushButton::hover {background-color: #dedede;}"
+                "QPushButton::pressed {background-color: #dadada;}")
         # Указание конца промежутка
         elif self.second_pressed_index == -1:
             self.second_pressed_index = pressed_button_index
@@ -605,9 +576,9 @@ class MMBody(QMainWindow):
             if pressed_button_index < self.first_pressed_index:
                 for i in range(pressed_button_index, self.first_pressed_index):
                     self.photo_button_mass[i].setStyleSheet(
-                            "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
-                            "QPushButton::hover {background-color: #dedede;}"
-                            "QPushButton::pressed {background-color: #dadada;}")
+                        "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
+                        "QPushButton::hover {background-color: #dedede;}"
+                        "QPushButton::pressed {background-color: #dadada;}")
 
                 self.first_pressed_index = pressed_button_index
             # Изменение конца промежутка
@@ -625,18 +596,18 @@ class MMBody(QMainWindow):
                 if (pressed_button_index - self.first_pressed_index) < (self.second_pressed_index - pressed_button_index):
                     for i in range(self.first_pressed_index, pressed_button_index):
                         self.photo_button_mass[i].setStyleSheet(
-                                "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
-                                "QPushButton::hover {background-color: #dedede;}"
-                                "QPushButton::pressed {background-color: #dadada;}")
+                            "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
+                            "QPushButton::hover {background-color: #dedede;}"
+                            "QPushButton::pressed {background-color: #dadada;}")
 
                     self.first_pressed_index = pressed_button_index
                 # Обрезаем конец
                 else:
                     for i in range(pressed_button_index + 1, self.second_pressed_index + 1):
                         self.photo_button_mass[i].setStyleSheet(
-                                "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
-                                "QPushButton::hover {background-color: #dedede;}"
-                                "QPushButton::pressed {background-color: #dadada;}")
+                            "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
+                            "QPushButton::hover {background-color: #dedede;}"
+                            "QPushButton::pressed {background-color: #dadada;}")
 
                     self.second_pressed_index = pressed_button_index
 
@@ -648,9 +619,9 @@ class MMBody(QMainWindow):
 
 
     def selective_selection(self, pressed_button_index: int) -> bool:
-        '''
-        :return: Функция возвращает True, если выполнены все условия для открытия right_block
-        '''
+        """
+        :return: Функция возвращает True, если выполнены все условия для открытия right_block.
+        """
 
         if self.paths_to_all_files_list[pressed_button_index] in self.selected_files_way_mass:
             self.photo_button_mass[pressed_button_index].setStyleSheet(
@@ -666,9 +637,9 @@ class MMBody(QMainWindow):
             self.selected_files_mass.append(self.photo_button_mass[pressed_button_index])
 
             self.photo_button_mass[pressed_button_index].setStyleSheet(
-                    "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
-                    "QPushButton::hover {background-color: #dedede;}"
-                    "QPushButton::pressed {background-color: #dadada;}")
+                "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
+                "QPushButton::hover {background-color: #dedede;}"
+                "QPushButton::pressed {background-color: #dadada;}")
 
         if len(self.selected_files_mass) > 1:
             return #True
@@ -678,24 +649,24 @@ class MMBody(QMainWindow):
             return
 
 
-    def arrow_button_pressed(self, side: str):
-        '''
-        Функция перелистывания медиафайлов в right_block 
+    def arrow_button_pressing(self, side: str):
+        """
+        Функция перелистывания медиафайлов в right_block.
 
-        :param side: Переменная, обозначающая сторону, в которую будет выполняться перелистывание
-        '''
+        :param side: Переменная, обозначающая сторону, в которую будет выполняться перелистывание.
+        """
 
         if self.selection_type == 1:
             if side == 'left':
                 self.photo_button_mass[self.previous_button_index].setStyleSheet(
-                            "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
-                            "QPushButton::hover {background-color: #dedede;}"
-                            "QPushButton::pressed {background-color: #dadada;}")
+                    "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
+                    "QPushButton::hover {background-color: #dedede;}"
+                    "QPushButton::pressed {background-color: #dadada;}")
 
                 self.photo_button_mass[self.previous_button_index - 1].setStyleSheet(
-                            "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
-                            "QPushButton::hover {background-color: #dedede;}"
-                            "QPushButton::pressed {background-color: #dadada;}")
+                    "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
+                    "QPushButton::hover {background-color: #dedede;}"
+                    "QPushButton::pressed {background-color: #dadada;}")
 
                 icon_way = self.paths_to_all_files_list[self.previous_button_index - 1]
                 self.selected_files_mass = [self.photo_button_mass[self.previous_button_index - 1]]
@@ -713,14 +684,14 @@ class MMBody(QMainWindow):
             # right
             else:
                 self.photo_button_mass[self.previous_button_index].setStyleSheet(
-                            "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
-                            "QPushButton::hover {background-color: #dedede;}"
-                            "QPushButton::pressed {background-color: #dadada;}")
+                    "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
+                    "QPushButton::hover {background-color: #dedede;}"
+                    "QPushButton::pressed {background-color: #dadada;}")
 
                 self.photo_button_mass[self.previous_button_index + 1].setStyleSheet(
-                            "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
-                            "QPushButton::hover {background-color: #dedede;}"
-                            "QPushButton::pressed {background-color: #dadada;}")
+                    "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
+                    "QPushButton::hover {background-color: #dedede;}"
+                    "QPushButton::pressed {background-color: #dadada;}")
 
                 self.selected_files_mass = [self.photo_button_mass[self.previous_button_index + 1]]
                 self.selected_files_way_mass = [self.paths_to_all_files_list[self.previous_button_index + 1]]
@@ -739,9 +710,9 @@ class MMBody(QMainWindow):
 
     def add_tag(self, index_: int) -> None:
         """
-        Функция добавляет тег(и) в листвиджеты
+        Функция добавляет тег(и) в листвиджеты.
 
-        :param index_: Индекс измененного медиафайла. Равен -1, когда пользователь хочет добавить тег нажатием 'Enter'
+        :param index_: Индекс измененного медиафайла. Равен -1, когда пользователь хочет добавить тег нажатием 'Enter'.
         """
         # Нажатие на кнопку +
         if index_ != -1:
@@ -845,7 +816,7 @@ class MMBody(QMainWindow):
 
     def layout_cleaner(self, layout: object) -> None:
         """
-        Функция полностью очищает содержимое заданного на вход layout
+        Функция полностью очищает содержимое заданного на вход layout.
         """
         if layout is not None:
             while layout.count():
@@ -868,7 +839,7 @@ class MMBody(QMainWindow):
     @staticmethod
     def db_init() -> None:
         """
-        Функция инициализирует базу данных при запуске программы
+        Функция инициализирует базу данных при запуске программы.
         """
         if platform.startswith("win"):
             with sqlite3.connect("winDataBase.db") as db:
@@ -888,9 +859,9 @@ class MMBody(QMainWindow):
 
     def window_resize(self, type_: str) -> None:
         """
-        Функция автоматического изменения размера окна
+        Функция автоматического изменения размера окна.
 
-        :param type_: Переменная, отвечающая за вид изменения размера
+        :param type_: Переменная, отвечающая за вид изменения размера.
         """
         tab_index = self.ui.tabWidget.currentIndex()
         # Первый запуск программы
@@ -900,7 +871,7 @@ class MMBody(QMainWindow):
             self.animation.setEasingCurve(QEasingCurve.Linear)
             self.animation.setStartValue(QSize(20, 20))
             self.animation.setEndValue(QSize(500, 540))
-            self.animation.start()
+            self.animation.start(QPropertyAnimation.DeleteWhenStopped)
         # Переключение между вкладками программы
         elif type_ == "change":
             # Проверка на несохраненные значения в окне настроек  
@@ -949,31 +920,61 @@ class MMBody(QMainWindow):
                                               new_size[0], new_size[1]))
 
         if type_ == "left_window_opening":
-            self.move_animation.start()
+            self.move_animation.start(QPropertyAnimation.DeleteWhenStopped)
 
         elif type_ == "right_window_opening":
-            self.move_animation.start()
-            # self.animation_group = QParallelAnimationGroup()
-            # self.animation_group.addAnimation(self.move_animation)
+            self.move_animation.start(QPropertyAnimation.DeleteWhenStopped)
+            self.move_animation.finished.connect(self.pixmap_creation)
 
 
-    def pushbutton_style_creator(self, pushbutton: object) -> None:
-        pushbutton.setStyleSheet("QPushButton {background-color: #c7c7c7; border-radius: 7px; border: 1px solid #8a8a8a}"
-                                                "QPushButton::hover {background-color: #dedede;}"
-                                                "QPushButton::pressed {background-color: #dadada;}")
+    def pixmap_creation(self) -> None:
+        """
+        Функция добавляет pixmap к label в окне для просмотра увеличенных медиафайлов.
+        """
+        # self.right_window_label.setStyleSheet("QLabel {border: 0px solid black;}")
+
+        pixmap = QPixmap(self.paths_to_all_files_list[self.pressed_button_index]).scaled(
+            600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
+        self.right_window_label.setPixmap(pixmap)
+
+        opacity_effect = QGraphicsOpacityEffect(self.right_window_label)
+        self.right_window_label.setGraphicsEffect(opacity_effect)
+        self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
+        self.opacity_animation.setDuration(700)
+        self.opacity_animation.setStartValue(0.0)
+        self.opacity_animation.setEndValue(1.0)
+        self.opacity_animation.start(QPropertyAnimation.DeleteWhenStopped)
+        self.opacity_animation.finished.connect(self.label_shadow_effect)
+
+
+    def label_shadow_effect(self):
+        shadow = AnimatedShadowEffect()
+        shadow.setBlurRadius(50)
+        shadow.setYOffset(0)
+        shadow.setXOffset(0)
+
+        self.right_window_label.setGraphicsEffect(shadow)
+        shadow.animation_start()
+
+
+    def pushbutton_style_creator(self, pushbutton: QWidget) -> None:
+        pushbutton.setStyleSheet("QPushButton {background-color: #c7c7c7; "
+                                 "border-radius: 7px; border: 1px solid #8a8a8a}"
+                                 "QPushButton::hover {background-color: #dedede;}"
+                                 "QPushButton::pressed {background-color: #dadada;}")
         self.set_shadow_effect(pushbutton)
 
 
     @staticmethod
-    def set_shadow_effect(object_: object) -> None:
+    def set_shadow_effect(object_: QWidget) -> None:
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(4)
         shadow.setXOffset(0)
         shadow.setYOffset(0)
-
         object_.setGraphicsEffect(shadow)
 
-# Установка иконки приложения
+
+# Установка иконки приложения для Windows
 try:
     from PyQt5.QtWinExtras import QtWin
     myAppId = 'mycompany.myproduct.subproduct.version'
@@ -1172,6 +1173,24 @@ if __name__ == '__main__':
     #             self.ui.pushButton_open.setEnabled(False)
     #             self.ui.pushButton_delete_files.setEnabled(False)
     #
+    # def tags_splitting(self, file_way: str) -> list:
+    #     """
+    #     :return: Возвращаем массив с тегами, созданными по имени файла.
+    #     """
+    #     # Удаление пути файла, оставляем только поле с тегами
+    #     file_way = file_way.split('{')
+    #     file_way = file_way[-1]
+    #
+    #     # Удаление формата файла в конце строки
+    #     file_way = file_way.split('.')
+    #     file_way = file_way[0]
+    #
+    #     tags_mass = file_way.split(',')
+    #
+    #     for i in range(len(tags_mass)):
+    #         tags_mass[i] = tags_mass[i].strip()
+    #
+    #     return tags_mass
     #
     # # Добавление категорий на странице "Категории тегов"
     # def add_category(self):

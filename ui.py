@@ -96,15 +96,15 @@ try:
             f.seek(0)
             f.truncate()
             f.write(new_config)
-
-
-except: # Нет необходимого файла config в корневой папке / первый запуск программы
+# Нет необходимого файла config в корневой папке / первый запуск программы
+except:
     config_file = open("config.txt", "w+", encoding='utf-8')
     config_file.write(standart_config)
     config_file.close()
 
 for i in range(len(all_tags)):
     all_tags[i].sort()
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
