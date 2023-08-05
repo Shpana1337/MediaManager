@@ -76,9 +76,9 @@ class MMBody(QMainWindow):
                                           "QPushButton::hover {background-color: #dedede; " \
                                           "QPushButton::pressed {background-color: #dadada;} " \
                                           "QToolTip {border: 1px solid black; background-color: white}"
-        self.pushbutton_style_creator(self.ui.pushbutton_open_folder)
+        self.pushbutton_style_creator(pushbutton=self.ui.pushbutton_open_folder)
         self.db_init()
-        self.window_resize('start')
+        self.window_resize(type_="start")
 
         self.ui.pushbutton_open_folder.pressed.connect(self.open_folder)
         # Конфигурация чекбоксов
@@ -113,7 +113,7 @@ class MMBody(QMainWindow):
         dirlist = QFileDialog.getExistingDirectory(self, "Выбрать папку", ".")
         path = Path(dirlist)
 
-        self.layout_cleaner(self.ui.verticalLayout_11)
+        self.layout_cleaner(layout=self.ui.verticalLayout_11)
 
         files_was_founded = False
         self.paths_to_all_files_list = []
@@ -127,20 +127,20 @@ class MMBody(QMainWindow):
 
             if _file_name.lower().endswith(photo_formats):
                 files_was_founded = True
-                self.block_creator(_file_way, True)
+                self.block_creator(file_way=_file_way, file_is_photo=True)
                 self.paths_to_all_files_list.append(_file_way)
 
             elif _file_name.lower().endswith(video_formats):
                 files_was_founded = True
-                self.block_creator(_file_way, False)
+                self.block_creator(file_way=_file_way, file_is_photo=False)
                 self.paths_to_all_files_list.append(_file_way)
 
         if files_was_founded:
             self.upper_lower_layouts_creating()
 
-        self.opening_adding_tags(self.paths_to_all_files_list)
+        self.opening_adding_tags()
         self.previous_elements_mass = self.all_tags_mass_creating()
-        self.window_resize('left_window_opening')
+        self.window_resize(type_="left_window_opening")
 
         # present_tags = self.all_tags_mass_creating()
         # tag_founded_flag = False
@@ -207,24 +207,24 @@ class MMBody(QMainWindow):
         button_photo.setStyleSheet("QPushButton {background-color: white;border-radius: 7px; border: 1px solid #8a8a8a}"
                                    "QPushButton::hover {background-color: #eaeaea;}"
                                    "QPushButton::pressed {background-color: #dadada;}")
-        self.set_shadow_effect(button_photo)
+        self.set_shadow_effect(object_=button_photo)
 
         horizontal_layout.addWidget(button_photo)
         self.photo_button_mass.append(button_photo)
 
         pressed_button_index = self.photo_button_mass.index(button_photo)
-        button_photo.pressed.connect(lambda: self.right_window_changing(pressed_button_index))
+        button_photo.pressed.connect(lambda: self.right_window_changing(pressed_button_index=pressed_button_index))
 
         ## Сборка правого лэйаута
         vertical_layout = QVBoxLayout()
 
         list_widget = QListWidget()
-        self.set_shadow_effect(list_widget)
+        self.set_shadow_effect(object_=list_widget)
 
         button_delete_tag = QPushButton()
         button_delete_tag.setText('-')
-        self.pushbutton_style_creator(button_delete_tag)
-        button_delete_tag.setMinimumSize(50,25)
+        self.pushbutton_style_creator(pushbutton=button_delete_tag)
+        button_delete_tag.setMinimumSize(50, 25)
 
         ### Сборка лэйаута для line edit и кнопки
         horizontal_layout_for_line_edit = QHBoxLayout()
@@ -232,14 +232,14 @@ class MMBody(QMainWindow):
         button_add_tag = QPushButton()
         button_add_tag.setText('+')
 
-        self.pushbutton_style_creator(button_add_tag)
-        button_add_tag.setMinimumSize(65,25)
+        self.pushbutton_style_creator(pushbutton=button_add_tag)
+        button_add_tag.setMinimumSize(65, 25)
 
         line_edit = QLineEdit()
         line_edit.setPlaceholderText('Введите тег:')
         line_edit.setStyleSheet("QLineEdit {border-radius: 7px; border: 1px solid #8a8a8a;}")
-        line_edit.setMinimumSize(70,25)
-        self.set_shadow_effect(line_edit)
+        line_edit.setMinimumSize(70, 25)
+        self.set_shadow_effect(object_=line_edit)
 
         horizontal_layout_for_line_edit.addWidget(line_edit)
         horizontal_layout_for_line_edit.addWidget(button_add_tag)
@@ -262,16 +262,14 @@ class MMBody(QMainWindow):
 
         pressed_button_index = self.add_buttons_mass.index(button_add_tag)
 
-        button_add_tag.pressed.connect(lambda: self.add_tag(pressed_button_index))
-        button_delete_tag.pressed.connect(lambda: self.delete_tag(pressed_button_index))
+        button_add_tag.pressed.connect(lambda: self.add_tag(index_=pressed_button_index))
+        button_delete_tag.pressed.connect(lambda: self.delete_tag(index_=pressed_button_index))
 
 
-    def opening_adding_tags(self, all_files_paths: list) -> None:
+    def opening_adding_tags(self) -> None:
         """
         Функция добавляет ко всем файлам теги, если они были ранее загружены в базу данных.
         Вызывается только после открытия папки с медиафайлами.
-
-        :param all_files_paths: Массив, содержащий все директории файлов.
         """
         if platform.startswith("win"):
             db_name = "winDataBase.db"
@@ -282,7 +280,7 @@ class MMBody(QMainWindow):
             cursor = db.cursor()
             _file_index = 0
 
-            for _file_way in all_files_paths:
+            for _file_way in self.paths_to_all_files_list:
                 _file_id = stat(_file_way, follow_symlinks=False).st_ino
                 _file_tags = cursor.execute("SELECT tags FROM media_files WHERE file_id = ?", (_file_id,)).fetchone()
 
@@ -322,7 +320,7 @@ class MMBody(QMainWindow):
         button_cancel_selection.setEnabled(False)
         button_cancel_selection.pressed.connect(self.right_block_cleaner)
         self.button_cancel_selection = button_cancel_selection
-        self.pushbutton_style_creator(button_cancel_selection)
+        self.pushbutton_style_creator(pushbutton=button_cancel_selection)
 
         self.ui.upperbuttons_horizontal_layout.addWidget(combo_box)
         self.ui.upperbuttons_horizontal_layout.addWidget(button_cancel_selection)
@@ -333,14 +331,14 @@ class MMBody(QMainWindow):
         save_button.setEnabled(False)
         save_button.pressed.connect(self.save_tags)
         self.save_button = save_button
-        self.pushbutton_style_creator(save_button)
+        self.pushbutton_style_creator(pushbutton=save_button)
 
         cancel_button = QPushButton()
         cancel_button.setText('Отменить изменения')
         cancel_button.setMinimumSize(65, 25)
         cancel_button.setEnabled(False)
         self.cancel_button = cancel_button
-        self.pushbutton_style_creator(cancel_button)
+        self.pushbutton_style_creator(pushbutton=cancel_button)
 
         self.ui.lowerbuttons_horizontal_layout.addWidget(save_button)
         self.ui.lowerbuttons_horizontal_layout.addWidget(cancel_button)
@@ -371,7 +369,7 @@ class MMBody(QMainWindow):
 
 
     def right_block_cleaner(self) -> None:
-        self.layout_cleaner(self.ui.verticalLayout_right_window)
+        self.layout_cleaner(layout=self.ui.verticalLayout_right_window)
         self.button_cancel_selection.setEnabled(False)
         self.right_window_is_open = False
         self.first_pressed_index = -1
@@ -386,7 +384,7 @@ class MMBody(QMainWindow):
         self.selected_files_mass = []
         self.selected_files_way_mass = []
 
-        self.window_resize('left_window_opening')
+        self.window_resize(type_="left_window_opening")
 
         # self.photo_button_mass[self.previous_button_index].setStyleSheet(
         #     "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
@@ -400,9 +398,9 @@ class MMBody(QMainWindow):
 
         :param pressed_button_index: Индекс нажатого медиафайла.
         """
-        if self.right_block_create_test(pressed_button_index):
+        if self.right_block_create_test(pressed_button_index=pressed_button_index):
             print(f'Ready to create a block! Selection_type = {self.selection_type}')
-            self.window_resize('right_window_opening')
+            self.window_resize(type_="right_window_opening")
             # Создание блока с фотографией
             if self.button_is_photo_mass[pressed_button_index]:
                 self.photo_block_creating(pressed_button_index)
@@ -443,14 +441,14 @@ class MMBody(QMainWindow):
         left_arrow.setMinimumSize(65, 25)
         self.left_arrow = left_arrow
         self.pushbutton_style_creator(left_arrow)
-        left_arrow.pressed.connect(lambda: self.arrow_button_pressing('left'))
+        left_arrow.pressed.connect(lambda: self.arrow_button_pressing(side="left"))
 
         right_arrow = QPushButton()
         right_arrow.setText('>>')
         right_arrow.setMinimumSize(65, 25)
         self.right_arrow = right_arrow
-        self.pushbutton_style_creator(right_arrow)
-        right_arrow.pressed.connect(lambda: self.arrow_button_pressing('right'))
+        self.pushbutton_style_creator(pushbutton=right_arrow)
+        right_arrow.pressed.connect(lambda: self.arrow_button_pressing(side="right"))
 
         self.previous_button_index = pressed_button_index
 
@@ -477,9 +475,8 @@ class MMBody(QMainWindow):
         :param first_pressed_index: индекс первого нажатого элемента.
         :param second_pressed_index: индекс второго нажатого элемента.
         """
-
-        if not(self.right_window_is_open):
-            self.right_window_creating(pressed_button_index)
+        if not self.right_window_is_open:
+            self.right_window_creating(pressed_button_index=pressed_button_index)
             return
 
         if self.selection_type == 1:
@@ -540,10 +537,10 @@ class MMBody(QMainWindow):
             return True
         # Выделение "от и до"
         elif self.selection_type == 2:
-            return self.from_to_selection(pressed_button_index)
+            return self.from_to_selection(pressed_button_index=pressed_button_index)
         # Выборочное выделение
         else:
-            return self.selective_selection(pressed_button_index)
+            return self.selective_selection(pressed_button_index=pressed_button_index)
 
 
     def from_to_selection(self, pressed_button_index: int) -> bool:
@@ -656,14 +653,12 @@ class MMBody(QMainWindow):
 
         :param side: Переменная, обозначающая сторону, в которую будет выполняться перелистывание.
         """
-
         if self.selection_type == 1:
-            if side == 'left':
+            if side == "left":
                 self.photo_button_mass[self.previous_button_index].setStyleSheet(
                     "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
                     "QPushButton::hover {background-color: #dedede;}"
                     "QPushButton::pressed {background-color: #dadada;}")
-
                 self.photo_button_mass[self.previous_button_index - 1].setStyleSheet(
                     "QPushButton {background-color: #dadada; border-radius: 7px; border: 1px solid #8a8a8a}"
                     "QPushButton::hover {background-color: #dedede;}"
@@ -681,7 +676,7 @@ class MMBody(QMainWindow):
 
                 if not(self.right_arrow.isEnabled()):
                     self.right_arrow.setEnabled(True)
-            # right
+            # side = "right"
             else:
                 self.photo_button_mass[self.previous_button_index].setStyleSheet(
                     "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
@@ -698,7 +693,7 @@ class MMBody(QMainWindow):
                 icon_way = self.paths_to_all_files_list[self.previous_button_index + 1]
                 self.previous_button_index += 1
 
-                self.animated_pixmap_change_1(icon_way, duration=100)
+                self.animated_pixmap_change_1(icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == len(self.photo_button_mass) - 1:
                     self.right_arrow.setEnabled(False)
@@ -708,7 +703,7 @@ class MMBody(QMainWindow):
 
 
     def animated_pixmap_change_1(self, icon_way: str, duration: int) -> None:
-        self.shadow_effect.animation.setDuration(duration)
+        self.animated_pixmap_change_shadow_init(duration=duration)
         self.shadow_effect.fading_animation_start()
         self.shadow_effect.animation.finished.connect(lambda: self.animated_pixmap_change_2(icon_way,
                                                                                             values=(1, 0),
@@ -739,18 +734,21 @@ class MMBody(QMainWindow):
 
 
     def animated_pixmap_change_4(self, duration: int) -> None:
+        self.animated_pixmap_change_shadow_init(duration=duration)
+        self.right_window_label.setGraphicsEffect(self.shadow_effect)
+        self.shadow_effect.rise_animation_start()
+
+
+    def animated_pixmap_change_shadow_init(self, duration: int) -> None:
         self.shadow_effect = AnimatedShadowEffect()
         self.shadow_effect.animation.setDuration(duration)
         self.shadow_effect.setXOffset(0)
         self.shadow_effect.setYOffset(0)
-        self.right_window_label.setGraphicsEffect(self.shadow_effect)
-
-        self.shadow_effect.rise_animation_start()
 
 
     def add_tag(self, index_: int) -> None:
         """
-        Функция добавляет тег(и) в листвиджеты.
+        Функция добавляет тег(и) в list widgets.
 
         :param index_: Индекс измененного медиафайла. Равен -1, когда пользователь хочет добавить тег нажатием 'Enter'.
         """
@@ -788,15 +786,19 @@ class MMBody(QMainWindow):
             for i in range(len(self.line_edits_mass)):
                 if self.line_edits_mass[i].text() != '':
                     self.changed_tags_indexes_list.add(i)
-                    self.add_tag(i)
+                    self.add_tag(index_=i)
             return
 
         self.previous_and_present_tags_equal_test()
 
 
     def delete_tag(self, index_: int) -> None:
-        a = self.list_widget_mass[index_].selectedIndexes()
+        """
+        Функция удаляет тег(и) из list widgets.
 
+        :param index_: Индекс измененного медиафайла.
+        """
+        a = self.list_widget_mass[index_].selectedIndexes()
         _selected_index = self.list_widget_mass[index_].count() - 1
         _items_mass = []
 
@@ -832,6 +834,7 @@ class MMBody(QMainWindow):
                 if not self.save_button.isEnabled():
                     self.save_button.setEnabled(True)
                     self.cancel_button.setEnabled(True)
+
                 is_equal = False
                 break
 
@@ -841,6 +844,9 @@ class MMBody(QMainWindow):
 
 
     def all_tags_mass_creating(self) -> list:
+        """
+        :return: Двумерный массив со всеми тегами.
+        """
         all_tags_mass = []
 
         for i in range(len(self.list_widget_mass)):
@@ -866,14 +872,14 @@ class MMBody(QMainWindow):
                 if widget is not None:
                     widget.setParent(None)
                 else:
-                    self.layout_cleaner(item.layout())
+                    self.layout_cleaner(layout=item.layout())
 
 
     def keyPressEvent(self, e) -> None:
         # Главное окно с медиафайлами
         if self.ui.tabWidget.currentIndex() == 0:
             if e.key() == Qt.Key_Return:
-                self.add_tag(-1)
+                self.add_tag(index_=-1)
 
 
     @staticmethod
@@ -930,12 +936,14 @@ class MMBody(QMainWindow):
                     self.ui.settings_init() #### Проверить!!!
 
         elif type_ == "left_window_opening": # Добавить зависимость от кол-ва фотографий в папке
-            self.move_window(((application.size().width() - 600) // 2,
-                              (application.size().height() - 700) // 2), (600, 700), "left_window_opening")
+            self.move_window(xy_shift=((application.size().width() - 600) // 2,
+                                       (application.size().height() - 700) // 2),
+                             new_size=(600, 700), type_="left_window_opening")
 
-        elif type_ == "right_window_opening":
-            self.move_window(((application.size().width() - 1250) // 2,
-                              (application.size().height() - 730) // 2), (1250, 730), "right_window_opening")
+        elif type_ == "right_window_opening": # Добавить зависимость от кол-ва фотографий в папке
+            self.move_window(xy_shift=((application.size().width() - 1250) // 2,
+                                       (application.size().height() - 730) // 2),
+                             new_size=(1250, 730), type_="right_window_opening")
 
         self.LastIndex = tab_index
 
@@ -1002,7 +1010,7 @@ class MMBody(QMainWindow):
                                  "border-radius: 7px; border: 1px solid #8a8a8a}"
                                  "QPushButton::hover {background-color: #dedede;}"
                                  "QPushButton::pressed {background-color: #dadada;}")
-        self.set_shadow_effect(pushbutton)
+        self.set_shadow_effect(object_=pushbutton)
 
 
     @staticmethod
