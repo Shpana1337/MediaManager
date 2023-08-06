@@ -16,6 +16,7 @@ from sys import platform
 from pathlib import Path
 from os import remove, stat
 from collections import Counter
+from statistics import mean
 
 import PyQt5.QtMultimediaWidgets
 from screeninfo import get_monitors
@@ -63,7 +64,7 @@ class MMBody(QMainWindow):
         self.delete_buttons_mass = []
         self.selected_files_mass = []
         self.button_is_photo_mass = []
-        self.previous_elements_mass = []
+        self.previous_tags_mass = []
         self.selected_files_way_mass = []
         self.paths_to_all_files_list = []
         self.shadow_effect = AnimatedShadowEffect()
@@ -139,7 +140,7 @@ class MMBody(QMainWindow):
             self.upper_lower_layouts_creating()
 
         self.opening_adding_tags()
-        self.previous_elements_mass = self.all_tags_mass_creating()
+        self.previous_tags_mass = self.all_tags_mass_creating()
         self.window_resize(type_="left_window_opening")
 
         # present_tags = self.all_tags_mass_creating()
@@ -282,7 +283,16 @@ class MMBody(QMainWindow):
 
             for _file_way in self.paths_to_all_files_list:
                 _file_id = stat(_file_way, follow_symlinks=False).st_ino
-                _file_tags = cursor.execute("SELECT tags FROM media_files WHERE file_id = ?", (_file_id,)).fetchone()
+                _device_id = stat(_file_way, follow_symlinks=False).st_dev
+                # Linux/Mac OS
+                if db_name.startswith("lin"):
+                    _file_tags = cursor.execute("SELECT tags FROM media_files WHERE device_id = ? AND file_id = ?",
+                                                (_device_id, _file_id)).fetchone()
+                # Windows
+                else:
+                    # Добавить проверку по имени диска
+                    _file_tags = cursor.execute("SELECT tags FROM media_files WHERE file_id = ?",
+                                                (_file_id, )).fetchone()
 
                 if _file_tags:
                     _file_tags = _file_tags[0].split(",")
@@ -337,6 +347,7 @@ class MMBody(QMainWindow):
         cancel_button.setText('Отменить изменения')
         cancel_button.setMinimumSize(65, 25)
         cancel_button.setEnabled(False)
+        cancel_button.pressed.connect(self.change_cancelling)
         self.cancel_button = cancel_button
         self.pushbutton_style_creator(pushbutton=cancel_button)
 
@@ -344,28 +355,59 @@ class MMBody(QMainWindow):
         self.ui.lowerbuttons_horizontal_layout.addWidget(cancel_button)
 
 
+    def change_cancelling(self) -> None:
+        for _index in self.changed_tags_indexes_list:
+            self.list_widget_mass[_index].clear()
+            self.list_widget_mass[_index].addItems(self.previous_tags_mass[_index])
+
+        self.cancel_button.setEnabled(False)
+        self.save_button.setEnabled(False)
+
+
     def save_tags(self) -> None:
         current_tags_list = self.all_tags_mass_creating()
 
-        for i in self.changed_tags_indexes_list:
-            with sqlite3.connect("database.db") as db:
-                cursor = db.cursor()
+        if platform.startswith("win"):
+            db_name = "winDataBase.db"
+        else:
+            db_name = "linDataBase.db"
+
+        with sqlite3.connect(db_name) as db:
+            cursor = db.cursor()
+            for i in self.changed_tags_indexes_list:
                 _file_path = self.paths_to_all_files_list[i]
                 _file_id = stat(_file_path, follow_symlinks=False).st_ino
-                _file_tags = cursor.execute("SELECT tags FROM media_files WHERE file_id = ?", (_file_id,)).fetchone()
+                _file_in_db = cursor.execute("SELECT tags FROM media_files WHERE file_id = ?", (_file_id,)).fetchone()
+                new_tags = ""
+
+                for tag in current_tags_list[i]:
+                    new_tags += f"{tag},"
+
+                new_tags = new_tags[:-1]
                 # Изменение тегов в бд (файл уже загружен)
-                if _file_tags:
-                    new_tags = ""
+                if _file_in_db:
+                    if new_tags:
+                        cursor.execute("UPDATE media_files SET tags = ? WHERE file_id = ?", (new_tags, _file_id))
 
-                    for tag in current_tags_list[i]:
-                        new_tags += f"{tag} "
-
-                    new_tags = new_tags[:-1:]
-                    cursor.execute("UPDATE media_files SET tags = ? WHERE file_id = ?", (new_tags, _file_id))
-                    db.commit()
+                    else:
+                        cursor.execute("DELETE FROM media_files WHERE file_id = ?", (_file_id,))
                 # Добавление нового файла в бд
-                else:
-                    pass
+                elif new_tags:
+                    # Windows
+                    if db_name.startswith("win"): # Дописать
+                        print(_file_path)
+                        _disk_name = _file_id
+                        # cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)", ())
+                    # Linux/Mac OS
+                    else:
+                        device_id = stat(_file_path, follow_symlinks=False).st_dev
+                        cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)", (device_id, _file_id, new_tags))
+
+            db.commit()
+
+        self.cancel_button.setEnabled(False)
+        self.save_button.setEnabled(False)
+
 
 
     def right_block_cleaner(self) -> None:
@@ -669,7 +711,7 @@ class MMBody(QMainWindow):
                 self.selected_files_way_mass = [self.paths_to_all_files_list[self.previous_button_index - 1]]
                 self.previous_button_index -= 1
 
-                self.animated_pixmap_change_1(icon_way, duration=100)
+                self.animated_pixmap_change_1(icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == 0:
                     self.left_arrow.setEnabled(False)
@@ -830,7 +872,7 @@ class MMBody(QMainWindow):
 
         for i in self.changed_tags_indexes_list:
             # Проверка на содержание одинаковых элементов
-            if Counter(present_tags[i]) != Counter(self.previous_elements_mass[i]):
+            if Counter(present_tags[i]) != Counter(self.previous_tags_mass[i]):
                 if not self.save_button.isEnabled():
                     self.save_button.setEnabled(True)
                     self.cancel_button.setEnabled(True)
