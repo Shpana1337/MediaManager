@@ -25,10 +25,11 @@ from moviepy.editor import VideoFileClip
 from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QPoint, QRect, \
-                        QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup, QAbstractAnimation
+                        QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup, QAbstractAnimation, QSizeF
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
     QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
-    QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, QGraphicsOpacityEffect
+    QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, \
+    QGraphicsOpacityEffect, QGraphicsScene, QGraphicsView
 
 from ui import Ui_MainWindow
 from AnimatedEffects import AnimatedShadowEffect
@@ -53,6 +54,7 @@ class MMBody(QMainWindow):
         self.right_window_label = None
         self.pressed_button_index = None
         self.button_cancel_selection = None
+        self.db_name = ""
         self.selection_type = 1
         self.first_pressed_index = -1
         self.second_pressed_index = -1
@@ -169,8 +171,8 @@ class MMBody(QMainWindow):
         """
         # Сборка главного лэйаута блока
         horizontal_layout = QHBoxLayout()
-        button_photo = QPushButton()
-        button_photo.setMinimumSize(QSize(250, 170))
+        media_button = QPushButton()
+        media_button.setMinimumSize(QSize(250, 170))
 
         if file_is_photo:
             icon = file_way
@@ -185,36 +187,36 @@ class MMBody(QMainWindow):
             self.button_is_photo_mass.append(False)
 
             # video_item = QGraphicsVideoItem()
-            # video_item.setSize((QtCore.QSizeF(250,170)))
+            # video_item.setSize((QSizeF(250, 170)))
             #
-            # scene = QtWidgets.QGraphicsScene(self)
+            # scene = QGraphicsScene(self)
             # scene.addItem(video_item)
-            # graphicsView = QtWidgets.QGraphicsView(scene)
-            # graphicsView.setMinimumSize(QtCore.QSize(250,170))
-            # layout = QtWidgets.QVBoxLayout()
-            # layout.addWidget(graphicsView)
+            # graphics_view = QGraphicsView(scene)
+            # graphics_view.setMinimumSize(QSize(250, 170))
+            # layout = QVBoxLayout()
+            # layout.addWidget(graphics_view)
             # self.setLayout(layout)
             # self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
             # self.media_player.setVideoOutput(video_item)
             # self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
             #
             # self.media_player.play()
-            # self.media_player.stop()
+            # # self.media_player.stop()
             #
             # horizontal_layout.addLayout(layout)
 
-        button_photo.setIcon(QIcon(icon))
-        button_photo.setIconSize(QSize(220, 160))
-        button_photo.setStyleSheet("QPushButton {background-color: white;border-radius: 7px; border: 1px solid #8a8a8a}"
+        media_button.setIcon(QIcon(icon))
+        media_button.setIconSize(QSize(220, 160))
+        media_button.setStyleSheet("QPushButton {background-color: white;border-radius: 7px; border: 1px solid #8a8a8a}"
                                    "QPushButton::hover {background-color: #eaeaea;}"
                                    "QPushButton::pressed {background-color: #dadada;}")
-        self.set_shadow_effect(object_=button_photo)
+        self.set_shadow_effect(object_=media_button)
 
-        horizontal_layout.addWidget(button_photo)
-        self.photo_button_mass.append(button_photo)
+        horizontal_layout.addWidget(media_button)
+        self.photo_button_mass.append(media_button)
 
-        pressed_button_index = self.photo_button_mass.index(button_photo)
-        button_photo.pressed.connect(lambda: self.right_window_changing(pressed_button_index=pressed_button_index))
+        pressed_button_index = self.photo_button_mass.index(media_button)
+        media_button.pressed.connect(lambda: self.right_window_changing(pressed_button_index=pressed_button_index))
 
         ## Сборка правого лэйаута
         vertical_layout = QVBoxLayout()
@@ -238,7 +240,7 @@ class MMBody(QMainWindow):
 
         line_edit = QLineEdit()
         line_edit.setPlaceholderText('Введите тег:')
-        line_edit.setStyleSheet("QLineEdit {border-radius: 7px; border: 1px solid #8a8a8a;}")
+        line_edit.setStyleSheet("QLineEdit {border-radius: 7px; border: 1px solid #8a8a8a; padding-left: 5px}")
         line_edit.setMinimumSize(70, 25)
         self.set_shadow_effect(object_=line_edit)
 
@@ -272,31 +274,33 @@ class MMBody(QMainWindow):
         Функция добавляет ко всем файлам теги, если они были ранее загружены в базу данных.
         Вызывается только после открытия папки с медиафайлами.
         """
-        if platform.startswith("win"):
-            db_name = "winDataBase.db"
-        else:
-            db_name = "linDataBase.db"
-
-        with sqlite3.connect(db_name) as db:
+        with sqlite3.connect(self.db_name) as db:
             cursor = db.cursor()
             _file_index = 0
 
-            for _file_way in self.paths_to_all_files_list:
-                _file_id = stat(_file_way, follow_symlinks=False).st_ino
-                _device_id = stat(_file_way, follow_symlinks=False).st_dev
+            for file_way in self.paths_to_all_files_list:
+                _file_id = stat(file_way, follow_symlinks=False).st_ino
+                _device_id = stat(file_way, follow_symlinks=False).st_dev
                 # Linux/Mac OS
-                if db_name.startswith("lin"):
-                    _file_tags = cursor.execute("SELECT tags FROM media_files WHERE device_id = ? AND file_id = ?",
-                                                (_device_id, _file_id)).fetchone()
+                if self.db_name.startswith("lin"):
+                    tag_indexes = cursor.execute("SELECT tag_index FROM media_files WHERE device_id = ? "
+                                                 "AND file_id = ?", (_device_id, _file_id)).fetchall()
                 # Windows
                 else:
-                    # Добавить проверку по имени диска
-                    _file_tags = cursor.execute("SELECT tags FROM media_files WHERE file_id = ?",
-                                                (_file_id, )).fetchone()
+                    _disk_name = file_way.split(":/")[0][-1]
+                    tag_indexes = cursor.execute("SELECT tag_index FROM media_files WHERE file_id = ? "
+                                                 "AND disk_name = ?", (_file_id, _disk_name)).fetchall()
 
-                if _file_tags:
-                    _file_tags = _file_tags[0].split(",")
-                    self.list_widget_mass[_file_index].addItems(_file_tags)
+                if tag_indexes:
+                    for el in tag_indexes:
+                        index_ = el[0]
+                        tag = cursor.execute("SELECT tag from tag_indexes WHERE tag_index = ?", (index_,)).fetchone()
+
+                        if tag:
+                            tag = tag[0]
+                            self.list_widget_mass[_file_index].addItem(tag.capitalize())
+                        else:
+                            raise sqlite3.Error
 
                 _file_index += 1
 
@@ -366,48 +370,79 @@ class MMBody(QMainWindow):
 
     def save_tags(self) -> None:
         current_tags_list = self.all_tags_mass_creating()
+        max_index = self.max_tag_index()
 
-        if platform.startswith("win"):
-            db_name = "winDataBase.db"
-        else:
-            db_name = "linDataBase.db"
-
-        with sqlite3.connect(db_name) as db:
+        with sqlite3.connect(self.db_name) as db:
             cursor = db.cursor()
+
             for i in self.changed_tags_indexes_list:
                 _file_path = self.paths_to_all_files_list[i]
                 _file_id = stat(_file_path, follow_symlinks=False).st_ino
-                _file_in_db = cursor.execute("SELECT tags FROM media_files WHERE file_id = ?", (_file_id,)).fetchone()
-                new_tags = ""
-
+                _device_id = stat(_file_path, follow_symlinks=False).st_dev
+                _disk_name = _file_path.split(":/")[0][-1]
+                # Добавление новых
                 for tag in current_tags_list[i]:
-                    new_tags += f"{tag},"
+                    if tag not in self.previous_tags_mass[i]:
+                        _tag_index = cursor.execute("SELECT tag_index FROM tag_indexes WHERE tag = ?",
+                                                    (tag,)).fetchone()
+                        # Присваивание индекса новому тегу
+                        if not _tag_index:
+                            cursor.execute("INSERT INTO tag_indexes VALUES(?, ?, ?)", (max_index + 1, tag, 0))
+                            max_index += 1
+                            _tag_index = max_index
 
-                new_tags = new_tags[:-1]
-                # Изменение тегов в бд (файл уже загружен)
-                if _file_in_db:
-                    if new_tags:
-                        cursor.execute("UPDATE media_files SET tags = ? WHERE file_id = ?", (new_tags, _file_id))
+                        else:
+                            _tag_index = _tag_index[0]
+                        # Windows
+                        if self.db_name.startswith("win"):
+                            if not cursor.execute("SELECT FROM media_files WHERE disk_name = ? AND file_id = ? "
+                                                  "AND tag_index = ?", (_disk_name, _file_id, _tag_index)).fetchone():
+                                cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
+                                               (_disk_name, _file_id, _tag_index))
+                                cursor.execute("UPDATE tag_indexes SET count = count + 1 WHERE tag = ?", (tag,))
+                        # Linux/Mac OS
+                        else:
+                            if not cursor.execute("SELECT * FROM media_files WHERE device_id = ? AND file_id = ? "
+                                                  "AND tag_index = ?", (_device_id, _file_id, _tag_index)).fetchone():
+                                cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
+                                               (_device_id, _file_id, _tag_index))
+                                cursor.execute("UPDATE tag_indexes SET count = count + 1 WHERE tag = ?", (tag,))
 
-                    else:
-                        cursor.execute("DELETE FROM media_files WHERE file_id = ?", (_file_id,))
-                # Добавление нового файла в бд
-                elif new_tags:
-                    # Windows
-                    if db_name.startswith("win"): # Дописать
-                        print(_file_path)
-                        _disk_name = _file_id
-                        # cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)", ())
-                    # Linux/Mac OS
-                    else:
-                        device_id = stat(_file_path, follow_symlinks=False).st_dev
-                        cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)", (device_id, _file_id, new_tags))
+                db.commit()
+                # Очистка удаленных тегов
+                for old_tag in self.previous_tags_mass[i]:
+                    if old_tag not in current_tags_list[i]:
+                        index_and_count = cursor.execute("SELECT tag_index, count FROM tag_indexes WHERE tag = ?",
+                                                         (old_tag,)).fetchone()
+
+                        if not index_and_count:
+                            raise sqlite3.Error
+
+                        cursor.execute("DELETE FROM media_files WHERE device_id = ? AND file_id = ? AND tag_index = ?",
+                                       (_device_id, _file_id, index_and_count[0]))
+
+                        if index_and_count[1] - 1 == 0:
+                            cursor.execute("DELETE FROM tag_indexes WHERE tag = ?", (old_tag,))
+
+                        else:
+                            cursor.execute("UPDATE tag_indexes SET count = count - 1 WHERE tag = ?", (old_tag,))
 
             db.commit()
 
         self.cancel_button.setEnabled(False)
         self.save_button.setEnabled(False)
+        self.previous_tags_mass = self.all_tags_mass_creating()
 
+
+    def max_tag_index(self) -> int:
+        with sqlite3.connect(self.db_name) as db:
+            cursor = db.cursor()
+            max_index = cursor.execute("SELECT MAX(tag_index) FROM tag_indexes").fetchone()[0]
+
+            if max_index:
+                return max_index
+            else:
+                return 0
 
 
     def right_block_cleaner(self) -> None:
@@ -534,8 +569,11 @@ class MMBody(QMainWindow):
                     "QPushButton::hover {background-color: #dedede;}"
                     "QPushButton::pressed {background-color: #dadada;}")
 
-                pixmap = QPixmap(self.paths_to_all_files_list[pressed_button_index]).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
-                self.right_window_label.setPixmap(pixmap)
+                self.animated_pixmap_change_1(icon_way=self.paths_to_all_files_list[pressed_button_index],
+                                              duration=100)
+                # pixmap = QPixmap(self.paths_to_all_files_list[pressed_button_index]).scaled(
+                #     600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
+                # self.right_window_label.setPixmap(pixmap)
 
                 self.previous_button_index = pressed_button_index
 
@@ -863,6 +901,7 @@ class MMBody(QMainWindow):
             new_item.setForeground(_items_mass[i][1])
             self.list_widget_mass[index_].addItem(new_item)
 
+        self.changed_tags_indexes_list.add(index_)
         self.previous_and_present_tags_equal_test()
 
 
@@ -895,7 +934,7 @@ class MMBody(QMainWindow):
             _mass = []
             if self.list_widget_mass[i].count() != 0:
                 for j in range(self.list_widget_mass[i].count()):
-                    _mass.append(self.list_widget_mass[i].item(j).text())
+                    _mass.append(self.list_widget_mass[i].item(j).text().lower())
             # добавляем в двумерный массив либо пустые массивы, если в лв нет тегов, либо массив с элементами лв
             all_tags_mass.append(_mass)
 
@@ -924,21 +963,30 @@ class MMBody(QMainWindow):
                 self.add_tag(index_=-1)
 
 
-    @staticmethod
-    def db_init() -> None:
+    def db_init(self) -> None:
         """
         Функция инициализирует базу данных при запуске программы.
         """
         if platform.startswith("win"):
+            self.db_name = "winDataBase.db"
+
             with sqlite3.connect("winDataBase.db") as db:
                 cursor = db.cursor()
-                cursor.execute(""" CREATE TABLE IF NOT EXISTS media_files (disk_name TEXT, file_id TEXT, tags TEXT) """)
+                cursor.executescript("""
+                CREATE TABLE IF NOT EXISTS media_files (disk_name TEXT, file_id TEXT, tag_index BIGINT);
+                CREATE TABLE IF NOT EXISTS tag_indexes (tag_index BIGINT, tag TEXT, count BIGINT);
+                """)
                 db.commit()
 
         elif platform == "darwin" or platform.startswith("linux"):
+            self.db_name = "linDataBase.db"
+
             with sqlite3.connect("linDataBase.db") as db:
                 cursor = db.cursor()
-                cursor.execute(""" CREATE TABLE IF NOT EXISTS media_files (device_id TEXT, file_id TEXT, tags TEXT) """)
+                cursor.executescript("""
+                CREATE TABLE IF NOT EXISTS media_files (device_id TEXT, file_id TEXT, tag_index BIGINT);
+                CREATE TABLE IF NOT EXISTS tag_indexes (tag_index BIGINT, tag TEXT, count BIGINT);
+                """)
                 db.commit()
 
         else:
@@ -1030,7 +1078,7 @@ class MMBody(QMainWindow):
         opacity_effect = QGraphicsOpacityEffect(self.right_window_label)
         self.right_window_label.setGraphicsEffect(opacity_effect)
         self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
-        self.opacity_animation.setDuration(700)
+        self.opacity_animation.setDuration(200)
         self.opacity_animation.setStartValue(0)
         self.opacity_animation.setEndValue(1)
         self.opacity_animation.start()
@@ -1041,7 +1089,7 @@ class MMBody(QMainWindow):
         self.shadow_effect = AnimatedShadowEffect()
         self.shadow_effect.setYOffset(0)
         self.shadow_effect.setXOffset(0)
-        self.shadow_effect.animation.setDuration(700)
+        self.shadow_effect.animation.setDuration(200)
 
         self.right_window_label.setGraphicsEffect(self.shadow_effect)
         self.shadow_effect.rise_animation_start()
