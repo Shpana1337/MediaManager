@@ -14,25 +14,27 @@ import sqlite3
 from time import time
 from sys import platform
 from pathlib import Path
+from statistics import mean
 from os import remove, stat
 from collections import Counter
-from statistics import mean
 
 import PyQt5.QtMultimediaWidgets
+import cv2
 from screeninfo import get_monitors
 from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPaintEvent, QColor
 from moviepy.editor import VideoFileClip
-from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem
-from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem, QVideoWidget
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent, QMediaObject
 from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QPoint, QRect, \
                         QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup, QAbstractAnimation, QSizeF
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
     QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
     QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, \
-    QGraphicsOpacityEffect, QGraphicsScene, QGraphicsView
+    QGraphicsOpacityEffect, QGraphicsScene, QGraphicsView, QSlider, QStyle
 
 from ui import Ui_MainWindow
 from AnimatedEffects import AnimatedShadowEffect
+from ScaledWidgets import PaintQSlider
 
 class MMBody(QMainWindow):
     def __init__(self):
@@ -54,6 +56,7 @@ class MMBody(QMainWindow):
         self.right_window_label = None
         self.pressed_button_index = None
         self.button_cancel_selection = None
+        self.video_slider = QSlider()
         self.db_name = ""
         self.selection_type = 1
         self.first_pressed_index = -1
@@ -71,7 +74,8 @@ class MMBody(QMainWindow):
         self.paths_to_all_files_list = []
         self.shadow_effect = AnimatedShadowEffect()
         self.changed_tags_indexes_list = set()
-        self.first_frame_folder = Path('icons_cache')
+        self.icons_cache_folder = Path('icons_cache')
+        self.start_media = True
         self.right_window_is_open = False
 
         self.button_stylesheet_settings = "QPushButton {background-color: #c7c7c7; " \
@@ -110,7 +114,7 @@ class MMBody(QMainWindow):
 
 
     def open_folder(self) -> None:
-        for file in self.first_frame_folder.iterdir():
+        for file in self.icons_cache_folder.iterdir():
             remove(file)
 
         dirlist = QFileDialog.getExistingDirectory(self, "Выбрать папку", ".")
@@ -179,31 +183,8 @@ class MMBody(QMainWindow):
             self.button_is_photo_mass.append(True)
         # file is video
         else:
-            # Сохраняем первый кадр видео для иконки в кнопку
-            video = VideoFileClip(file_way)
-            video.save_frame(f'{self.first_frame_folder}/{len(self.photo_button_mass)}.png', t=1)
-
-            icon = f'{self.first_frame_folder}/{len(self.photo_button_mass)}.png'
+            icon = self.get_first_video_frame(file_way=file_way)
             self.button_is_photo_mass.append(False)
-
-            # video_item = QGraphicsVideoItem()
-            # video_item.setSize((QSizeF(250, 170)))
-            #
-            # scene = QGraphicsScene(self)
-            # scene.addItem(video_item)
-            # graphics_view = QGraphicsView(scene)
-            # graphics_view.setMinimumSize(QSize(250, 170))
-            # layout = QVBoxLayout()
-            # layout.addWidget(graphics_view)
-            # self.setLayout(layout)
-            # self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
-            # self.media_player.setVideoOutput(video_item)
-            # self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
-            #
-            # self.media_player.play()
-            # # self.media_player.stop()
-            #
-            # horizontal_layout.addLayout(layout)
 
         media_button.setIcon(QIcon(icon))
         media_button.setIconSize(QSize(220, 160))
@@ -267,6 +248,24 @@ class MMBody(QMainWindow):
 
         button_add_tag.pressed.connect(lambda: self.add_tag(index_=pressed_button_index))
         button_delete_tag.pressed.connect(lambda: self.delete_tag(index_=pressed_button_index))
+
+
+    def get_first_video_frame(self, file_way: str) -> str:
+        """
+        Функция сохраняет первый кадр из видео.
+
+        :param file_way: Путь к видео.
+        :return: Путь к первому кадру.
+        """
+        video = cv2.VideoCapture(file_way)
+        video.set(cv2.CAP_PROP_POS_MSEC, 1 * 1000)
+        # Считываем кадр
+        ret, icon = video.read()
+        # Если кадр успешно считан, сохраняем его
+        if ret:
+            cv2.imwrite(f"{self.icons_cache_folder}/{len(self.photo_button_mass)}.jpg", icon)
+
+        return f"{self.icons_cache_folder}/{len(self.photo_button_mass)}.jpg"
 
 
     def opening_adding_tags(self) -> None:
@@ -480,10 +479,11 @@ class MMBody(QMainWindow):
             self.window_resize(type_="right_window_opening")
             # Создание блока с фотографией
             if self.button_is_photo_mass[pressed_button_index]:
-                self.photo_block_creating(pressed_button_index)
+                self.photo_block_creating(pressed_button_index=pressed_button_index)
             # Создание блока с видео
             else:
-                pass
+                print("video block creating")
+                self.video_block_creating(pressed_button_index=pressed_button_index)
 
             self.right_window_is_open = True
             self.button_cancel_selection.setEnabled(True)
@@ -511,6 +511,109 @@ class MMBody(QMainWindow):
         spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
         local_vertical_layout.addItem(spacer)
 
+        horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index=pressed_button_index)
+
+        local_vertical_layout.addLayout(horizontal_buttons_layout)
+        self.ui.verticalLayout_right_window.addWidget(back_widget)
+        self.previous_button_index = pressed_button_index
+
+
+    def video_block_creating(self, pressed_button_index: int) -> None:
+        back_widget = QWidget()
+        back_widget.setMaximumSize(600, 700)
+        back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
+
+        file_way = self.paths_to_all_files_list[pressed_button_index]
+        image_size = cv2.VideoCapture(file_way)
+        print(image_size.get(cv2.CAP_PROP_FRAME_HEIGHT), image_size.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+        layout = QVBoxLayout(back_widget)
+        spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+        # Добавить horizontal orientation и vertical orientation
+        video_widget = QVideoWidget(back_widget)
+        # video_widget.setMinimumSize(600 - 20, 338)
+        video_widget.setMinimumSize(394, 700)
+        # video_widget.move(10, 120)
+        self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
+        self.media_player.setVideoOutput(video_widget)
+        self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
+
+        horizontal_layout = QHBoxLayout()
+        self.video_slider = QSlider(Qt.Orientation.Horizontal)
+        # self.video_slider.setRange(0, 100)
+        self.video_slider.sliderMoved.connect(self.set_position)
+        self.media_player.positionChanged.connect(self.update_slider)
+        horizontal_layout.addWidget(self.video_slider)
+        play_button = QPushButton()
+        self.pushbutton_style_creator(play_button)
+        horizontal_layout.addWidget(play_button)
+        layout.addLayout(horizontal_layout)
+
+        play_button.pressed.connect(self.media_button_pressed)
+        self.start_media = True
+        self.ui.verticalLayout_right_window.addWidget(back_widget)
+        self.pressed_button_index = pressed_button_index
+
+
+    # @staticmethod
+    # def get_video_resolution(video_path):
+    #     video = VideoFileClip(video_path)
+    #     resolution = video.size
+    #     return resolution
+
+
+    def set_position(self, position: int) -> None:
+        self.media_player.setPosition(position)
+
+
+    def update_slider(self, position: int) -> None:
+        self.video_slider.setValue(position)
+
+
+    # def video_block_creating(self, pressed_button_index: int) -> None:
+    #     # Только горизонтальный формат
+    #     back_widget = QWidget()
+    #     back_widget.setMaximumSize(600, 700)
+    #     back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
+    #
+    #     file_way = self.paths_to_all_files_list[pressed_button_index]
+    #     video_item = QGraphicsVideoItem()
+    #     # video_item.setAspectRatioMode(Qt.KeepAspectRatioByExpanding)
+    #
+    #     scene = QGraphicsScene()
+    #     graphics_view = QGraphicsView(scene)
+    #     graphics_view.setMaximumSize(QSize(600, 700))
+    #     layout = QVBoxLayout(back_widget)
+    #     self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
+    #     self.media_player.setVideoOutput(video_item)
+    #     self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
+    #
+    #     spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
+    #     layout.addItem(spacer)
+    #     layout.addWidget(graphics_view)
+    #     video_item.setSize(QSizeF(graphics_view.size()) - QSizeF(20, 20))#(QSizeF(600-200, 700-200)))
+    #     scene.addItem(video_item)
+    #     spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
+    #     layout.addItem(spacer)
+    #
+    #
+    #     self.media_player.play()
+    #     # self.media_player.stop()
+    #     self.ui.verticalLayout_right_window.addWidget(back_widget)
+    #     self.pressed_button_index = pressed_button_index
+
+
+    def media_button_pressed(self) -> None:
+        if self.start_media:
+            self.media_player.play()
+            self.start_media = False
+        else:
+            self.media_player.pause()
+            self.start_media = True
+
+
+    def arrow_layout_creating(self, pressed_button_index: int) -> QWidget:
         horizontal_buttons_layout = QHBoxLayout()
 
         left_arrow = QPushButton()
@@ -527,8 +630,6 @@ class MMBody(QMainWindow):
         self.pushbutton_style_creator(pushbutton=right_arrow)
         right_arrow.pressed.connect(lambda: self.arrow_button_pressing(side="right"))
 
-        self.previous_button_index = pressed_button_index
-
         if pressed_button_index == 0:
             left_arrow.setEnabled(False)
 
@@ -537,8 +638,8 @@ class MMBody(QMainWindow):
 
         horizontal_buttons_layout.addWidget(left_arrow)
         horizontal_buttons_layout.addWidget(right_arrow)
-        local_vertical_layout.addLayout(horizontal_buttons_layout)
-        self.ui.verticalLayout_right_window.addWidget(back_widget)
+
+        return horizontal_buttons_layout
 
 
     def right_window_changing(self, pressed_button_index: int) -> None:
@@ -1069,7 +1170,9 @@ class MMBody(QMainWindow):
         """
         Функция добавляет pixmap к label в окне для просмотра увеличенных медиафайлов.
         """
-        # self.right_window_label.setStyleSheet("QLabel {border: 0px solid black;}")
+        # File is video
+        if not self.button_is_photo_mass[self.pressed_button_index]:
+            return
 
         pixmap = QPixmap(self.paths_to_all_files_list[self.pressed_button_index]).scaled(
             600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
