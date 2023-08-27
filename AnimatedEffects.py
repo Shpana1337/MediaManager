@@ -24,7 +24,6 @@ class AnimatedShadowEffect(QGraphicsDropShadowEffect):
 
     @pyqtProperty(int)
     def radius(self):
-
         return self.blur_radius
 
 

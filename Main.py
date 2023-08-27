@@ -17,16 +17,18 @@ from pathlib import Path
 from statistics import mean
 from os import remove, stat
 from collections import Counter
+from math import ceil, floor
 
-import PyQt5.QtMultimediaWidgets
+# import sip
 import cv2
+import PyQt5.QtMultimediaWidgets
 from screeninfo import get_monitors
-from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPaintEvent, QColor
+from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPaintEvent, QColor, QBrush
 from moviepy.editor import VideoFileClip
 from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem, QVideoWidget
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent, QMediaObject
 from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QPoint, QRect, \
-                        QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup, QAbstractAnimation, QSizeF
+                        QTimer, pyqtSlot, pyqtSignal, QParallelAnimationGroup, QAbstractAnimation, QSizeF, QRectF
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
     QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
     QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, \
@@ -53,10 +55,12 @@ class MMBody(QMainWindow):
         self.cancel_button = None
         self.move_animation = None
         self.opacity_animation = None
-        self.right_window_label = None
         self.pressed_button_index = None
         self.button_cancel_selection = None
         self.video_slider = QSlider()
+        self.right_window_label = QLabel()
+        self.video_widget = QVideoWidget()
+        self.media_player = QMediaPlayer()
         self.db_name = ""
         self.selection_type = 1
         self.first_pressed_index = -1
@@ -331,7 +335,7 @@ class MMBody(QMainWindow):
         button_cancel_selection.setMinimumSize(65, 25)
         button_cancel_selection.setMaximumSize(600, 25)
         button_cancel_selection.setEnabled(False)
-        button_cancel_selection.pressed.connect(self.right_block_cleaner)
+        button_cancel_selection.pressed.connect(lambda: self.animated_file_change_1(icon_way="", duration=200))
         self.button_cancel_selection = button_cancel_selection
         self.pushbutton_style_creator(pushbutton=button_cancel_selection)
 
@@ -482,7 +486,6 @@ class MMBody(QMainWindow):
                 self.photo_block_creating(pressed_button_index=pressed_button_index)
             # Создание блока с видео
             else:
-                print("video block creating")
                 self.video_block_creating(pressed_button_index=pressed_button_index)
 
             self.right_window_is_open = True
@@ -523,44 +526,32 @@ class MMBody(QMainWindow):
         back_widget.setMaximumSize(600, 700)
         back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
 
-        file_way = self.paths_to_all_files_list[pressed_button_index]
-        image_size = cv2.VideoCapture(file_way)
-        print(image_size.get(cv2.CAP_PROP_FRAME_HEIGHT), image_size.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.pressed_button_index = pressed_button_index
 
         layout = QVBoxLayout(back_widget)
         spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addItem(spacer)
-        # Добавить horizontal orientation и vertical orientation
-        video_widget = QVideoWidget(back_widget)
-        # video_widget.setMinimumSize(600 - 20, 338)
-        video_widget.setMinimumSize(394, 700)
-        # video_widget.move(10, 120)
-        self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
-        self.media_player.setVideoOutput(video_widget)
-        self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
+
+        self.video_widget = QVideoWidget(back_widget)
+        self.media_player = QMediaPlayer(self.video_widget, QMediaPlayer.VideoSurface)
 
         horizontal_layout = QHBoxLayout()
         self.video_slider = QSlider(Qt.Orientation.Horizontal)
-        # self.video_slider.setRange(0, 100)
         self.video_slider.sliderMoved.connect(self.set_position)
         self.media_player.positionChanged.connect(self.update_slider)
         horizontal_layout.addWidget(self.video_slider)
         play_button = QPushButton()
+        play_button.pressed.connect(self.play_button_pressed)
         self.pushbutton_style_creator(play_button)
         horizontal_layout.addWidget(play_button)
         layout.addLayout(horizontal_layout)
 
-        play_button.pressed.connect(self.media_button_pressed)
+        horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index=pressed_button_index)
+        layout.addLayout(horizontal_buttons_layout)
+
         self.start_media = True
         self.ui.verticalLayout_right_window.addWidget(back_widget)
         self.pressed_button_index = pressed_button_index
-
-
-    # @staticmethod
-    # def get_video_resolution(video_path):
-    #     video = VideoFileClip(video_path)
-    #     resolution = video.size
-    #     return resolution
 
 
     def set_position(self, position: int) -> None:
@@ -571,40 +562,7 @@ class MMBody(QMainWindow):
         self.video_slider.setValue(position)
 
 
-    # def video_block_creating(self, pressed_button_index: int) -> None:
-    #     # Только горизонтальный формат
-    #     back_widget = QWidget()
-    #     back_widget.setMaximumSize(600, 700)
-    #     back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
-    #
-    #     file_way = self.paths_to_all_files_list[pressed_button_index]
-    #     video_item = QGraphicsVideoItem()
-    #     # video_item.setAspectRatioMode(Qt.KeepAspectRatioByExpanding)
-    #
-    #     scene = QGraphicsScene()
-    #     graphics_view = QGraphicsView(scene)
-    #     graphics_view.setMaximumSize(QSize(600, 700))
-    #     layout = QVBoxLayout(back_widget)
-    #     self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
-    #     self.media_player.setVideoOutput(video_item)
-    #     self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
-    #
-    #     spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-    #     layout.addItem(spacer)
-    #     layout.addWidget(graphics_view)
-    #     video_item.setSize(QSizeF(graphics_view.size()) - QSizeF(20, 20))#(QSizeF(600-200, 700-200)))
-    #     scene.addItem(video_item)
-    #     spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
-    #     layout.addItem(spacer)
-    #
-    #
-    #     self.media_player.play()
-    #     # self.media_player.stop()
-    #     self.ui.verticalLayout_right_window.addWidget(back_widget)
-    #     self.pressed_button_index = pressed_button_index
-
-
-    def media_button_pressed(self) -> None:
+    def play_button_pressed(self) -> None:
         if self.start_media:
             self.media_player.play()
             self.start_media = False
@@ -670,8 +628,8 @@ class MMBody(QMainWindow):
                     "QPushButton::hover {background-color: #dedede;}"
                     "QPushButton::pressed {background-color: #dadada;}")
 
-                self.animated_pixmap_change_1(icon_way=self.paths_to_all_files_list[pressed_button_index],
-                                              duration=100)
+                self.animated_file_change_1(icon_way=self.paths_to_all_files_list[pressed_button_index],
+                                            duration=100)
                 # pixmap = QPixmap(self.paths_to_all_files_list[pressed_button_index]).scaled(
                 #     600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
                 # self.right_window_label.setPixmap(pixmap)
@@ -770,7 +728,7 @@ class MMBody(QMainWindow):
 
                 self.second_pressed_index = pressed_button_index
             # Обрезание промежутка (выбрана кнопка из диапазона)
-            elif pressed_button_index > self.first_pressed_index and pressed_button_index < self.second_pressed_index:
+            elif self.first_pressed_index < pressed_button_index < self.second_pressed_index:
                 # Обрезаем начало (расстояние от начала до выбранного индекса наименьшее)
                 if (pressed_button_index - self.first_pressed_index) < (self.second_pressed_index - pressed_button_index):
                     for i in range(self.first_pressed_index, pressed_button_index):
@@ -801,7 +759,6 @@ class MMBody(QMainWindow):
         """
         :return: Функция возвращает True, если выполнены все условия для открытия right_block.
         """
-
         if self.paths_to_all_files_list[pressed_button_index] in self.selected_files_way_mass:
             self.photo_button_mass[pressed_button_index].setStyleSheet(
                 "QPushButton {background-color: white; border-radius: 7px; border: 1px solid #8a8a8a}"
@@ -850,7 +807,7 @@ class MMBody(QMainWindow):
                 self.selected_files_way_mass = [self.paths_to_all_files_list[self.previous_button_index - 1]]
                 self.previous_button_index -= 1
 
-                self.animated_pixmap_change_1(icon_way=icon_way, duration=100)
+                self.animated_file_change_1(icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == 0:
                     self.left_arrow.setEnabled(False)
@@ -874,7 +831,7 @@ class MMBody(QMainWindow):
                 icon_way = self.paths_to_all_files_list[self.previous_button_index + 1]
                 self.previous_button_index += 1
 
-                self.animated_pixmap_change_1(icon_way=icon_way, duration=100)
+                self.animated_file_change_1(icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == len(self.photo_button_mass) - 1:
                     self.right_arrow.setEnabled(False)
@@ -883,48 +840,91 @@ class MMBody(QMainWindow):
                     self.left_arrow.setEnabled(True)
 
 
-    def animated_pixmap_change_1(self, icon_way: str, duration: int) -> None:
-        self.animated_pixmap_change_shadow_init(duration=duration)
+    def animated_file_change_1(self, icon_way: str, duration: int) -> None:
+        object_ = self.defining_media_object()
+
+        self.shadow_effect_init(duration=duration)
         self.shadow_effect.fading_animation_start()
-        self.shadow_effect.animation.finished.connect(lambda: self.animated_pixmap_change_2(icon_way,
-                                                                                            values=(1, 0),
-                                                                                            duration=duration))
+        self.shadow_effect.animation.finished.connect(lambda: self.animated_file_change_2(icon_way=icon_way,
+                                                                                          values=(1, 0),
+                                                                                          duration=duration,
+                                                                                          object_=object_))
 
 
-    def animated_pixmap_change_2(self, icon_way: str, values: tuple, duration: int) -> None:
-        opacity_effect = QGraphicsOpacityEffect(self.right_window_label)
-        self.right_window_label.setGraphicsEffect(opacity_effect)
+    def animated_file_change_2(self, icon_way: str, values: tuple, duration: int, object_: QWidget) -> None:
+        opacity_effect = QGraphicsOpacityEffect(object_)
+        object_.setGraphicsEffect(opacity_effect)
         self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
         self.opacity_animation.setDuration(duration)
         self.opacity_animation.setStartValue(values[0])
         self.opacity_animation.setEndValue(values[1])
         self.opacity_animation.start()
-        # Функция вызвана от animated_pixmap_changing_1
-        if values[0] == 1:
-            self.opacity_animation.finished.connect(lambda: self.animated_pixmap_change_3(icon_way,
-                                                                                          duration=duration))
-        # Функция вызвана от animated_pixmap_changing_3
+        # Функция вызвана нажатием кнопки "Отменить выделение"
+        if icon_way == "":
+            self.opacity_animation.finished.connect(self.right_block_cleaner)
+        # Функция вызвана от animated_file_change_1
+        elif values[0] == 1:
+            self.opacity_animation.finished.connect(lambda: self.animated_file_change_3(icon_way=icon_way,
+                                                                                        duration=duration,
+                                                                                        object_=object_))
+        # Функция вызвана от animated_file_change_3
         else:
-            self.opacity_animation.finished.connect(lambda: self.animated_pixmap_change_4(duration=duration))
+            self.opacity_animation.finished.connect(lambda: self.animated_file_change_4(duration=duration,
+                                                                                        object_=object_))
 
 
-    def animated_pixmap_change_3(self, icon_way: str, duration: int) -> None:
-        pixmap = QPixmap(icon_way).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
-        self.right_window_label.setPixmap(pixmap)
-        self.animated_pixmap_change_2(icon_way, values=(0, 1), duration=duration)
+    def animated_file_change_3(self, icon_way: str, duration: int, object_: QWidget) -> None:
+        if type(object_) == QVideoWidget:
+            pass
+
+        elif type(object_) == QLabel:
+            pixmap = QPixmap(icon_way).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
+            object_.setPixmap(pixmap)
+
+        else:
+            raise TypeError
+
+        self.animated_file_change_2(icon_way=icon_way, values=(0, 1), duration=duration, object_=object_)
 
 
-    def animated_pixmap_change_4(self, duration: int) -> None:
-        self.animated_pixmap_change_shadow_init(duration=duration)
-        self.right_window_label.setGraphicsEffect(self.shadow_effect)
+    def animated_file_change_4(self, duration: int, object_: QWidget) -> None:
+        self.shadow_effect_init(duration=duration)
+        object_.setGraphicsEffect(self.shadow_effect)
         self.shadow_effect.rise_animation_start()
 
 
-    def animated_pixmap_change_shadow_init(self, duration: int) -> None:
+    def animated_opacity_change(self, values: tuple, duration: int, object_: QWidget) -> None:
+        """
+        Функция плавно меняет прозрачность заданного на вход объекта.
+        """
+        opacity_effect = QGraphicsOpacityEffect(object_)
+        object_.setGraphicsEffect(opacity_effect)
+        self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
+        self.opacity_animation.setDuration(duration)
+        self.opacity_animation.setStartValue(values[0])
+        self.opacity_animation.setEndValue(values[1])
+        self.opacity_animation.start()
+
+
+    def shadow_effect_init(self, duration: int) -> None:
         self.shadow_effect = AnimatedShadowEffect()
         self.shadow_effect.animation.setDuration(duration)
         self.shadow_effect.setXOffset(0)
         self.shadow_effect.setYOffset(0)
+
+
+    def defining_media_object(self) -> QWidget:
+        """
+        Функция определяет активный виджет.
+        """
+        # File is photo
+        if self.button_is_photo_mass[self.pressed_button_index]:
+            object_ = self.right_window_label
+        # File is video
+        else:
+            object_ = self.video_widget
+
+        return object_
 
 
     def add_tag(self, index_: int) -> None:
@@ -1042,7 +1042,7 @@ class MMBody(QMainWindow):
         return all_tags_mass
 
 
-    def layout_cleaner(self, layout: object) -> None:
+    def layout_cleaner(self, layout: QWidget) -> None:
         """
         Функция полностью очищает содержимое заданного на вход layout.
         """
@@ -1052,13 +1052,25 @@ class MMBody(QMainWindow):
                 widget = item.widget()
 
                 if widget is not None:
-                    widget.setParent(None)
+                    ### Попробовать интегрировать
+                    ## Удаление виджетов без детей
+                    # layout.removeWidget(self.widget_name)
+                    # self.widget_name.deleteLater()
+                    # self.widget_name = None
+                    ## Удаление виджетов с детьми
+                    # import sip
+                    # layout.removeWidget(self.widget_name)
+                    # sip.delete(self.widget_name)
+                    # self.widget_name = None
+                    ###
+                    layout.removeWidget(widget)
+                    widget.deleteLater()
                 else:
                     self.layout_cleaner(layout=item.layout())
 
 
     def keyPressEvent(self, e) -> None:
-        # Главное окно с медиафайлами
+        # Главное окно с медиафайлами.
         if self.ui.tabWidget.currentIndex() == 0:
             if e.key() == Qt.Key_Return:
                 self.add_tag(index_=-1)
@@ -1121,7 +1133,7 @@ class MMBody(QMainWindow):
 
                 result = error_message.exec_()
 
-                if result == QMessageBox.Yes:
+                if result == QMessageBox.Yes: # Изменить сохранение настроек на QSettings
                     self.save_settings()
                 else:
                     self.ui.settings_init() #### Проверить!!!
@@ -1163,38 +1175,67 @@ class MMBody(QMainWindow):
 
         elif type_ == "right_window_opening":
             self.move_animation.start()
-            self.move_animation.finished.connect(self.pixmap_creation)
+            self.move_animation.finished.connect(self.media_creating)
 
 
-    def pixmap_creation(self) -> None:
+    def media_creating(self) -> None:
         """
         Функция добавляет pixmap к label в окне для просмотра увеличенных медиафайлов.
         """
+        # File is photo
+        if self.button_is_photo_mass[self.pressed_button_index]:
+            pixmap = QPixmap(self.paths_to_all_files_list[self.pressed_button_index]).scaled(
+                600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
+            self.right_window_label.setPixmap(pixmap)
+
+            media_object = self.right_window_label
         # File is video
-        if not self.button_is_photo_mass[self.pressed_button_index]:
-            return
+        else:
+            file_way = self.paths_to_all_files_list[self.pressed_button_index]
+            self.changing_video_size_and_position(file_way=file_way)
 
-        pixmap = QPixmap(self.paths_to_all_files_list[self.pressed_button_index]).scaled(
-            600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
-        self.right_window_label.setPixmap(pixmap)
+            self.media_player.setVideoOutput(self.video_widget)
+            self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
+            self.media_player.play()
+            self.media_player.pause()
 
-        opacity_effect = QGraphicsOpacityEffect(self.right_window_label)
-        self.right_window_label.setGraphicsEffect(opacity_effect)
+            media_object = self.video_widget
+
+        opacity_effect = QGraphicsOpacityEffect(media_object)
+        media_object.setGraphicsEffect(opacity_effect)
         self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
         self.opacity_animation.setDuration(200)
         self.opacity_animation.setStartValue(0)
         self.opacity_animation.setEndValue(1)
         self.opacity_animation.start()
-        self.opacity_animation.finished.connect(self.label_shadow_effect_init)
+        self.opacity_animation.finished.connect(lambda: self.media_shadow_effect_init(media_object))
 
 
-    def label_shadow_effect_init(self):
-        self.shadow_effect = AnimatedShadowEffect()
-        self.shadow_effect.setYOffset(0)
-        self.shadow_effect.setXOffset(0)
-        self.shadow_effect.animation.setDuration(200)
+    def changing_video_size_and_position(self, file_way: str) -> None:
+        """
+        Функция высчитывает оптимальный размер для QVideoWidget и центрирует его.
+        """
+        image_size = cv2.VideoCapture(file_way)
+        aspect_ratio = image_size.get(cv2.CAP_PROP_FRAME_HEIGHT) / image_size.get(cv2.CAP_PROP_FRAME_WIDTH)
+        # 575 - Высота back_widget с учетом кнопок.
+        # Horizontal orientation.
+        if aspect_ratio < 1:
+            width = 600 - 20
+            height = int(ceil(width * aspect_ratio))
+            self.video_widget.setMinimumSize(width, height)
+            self.video_widget.move(300 - width // 2, ceil((575 - height) / 2))
+        # Vertical orientation.
+        else:
+            height = 550
+            width = int(ceil(height / aspect_ratio))
+            self.video_widget.setMinimumSize(width, height)
+            self.video_widget.move(300 - width // 2, ceil((575 - height) / 2))
 
-        self.right_window_label.setGraphicsEffect(self.shadow_effect)
+
+    def media_shadow_effect_init(self, media_object: QWidget) -> None:
+        self.shadow_effect_init(duration=200)
+        media_object.setGraphicsEffect(self.shadow_effect)
+
         self.shadow_effect.rise_animation_start()
 
 
