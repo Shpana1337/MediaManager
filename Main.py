@@ -335,7 +335,8 @@ class MMBody(QMainWindow):
         button_cancel_selection.setMinimumSize(65, 25)
         button_cancel_selection.setMaximumSize(600, 25)
         button_cancel_selection.setEnabled(False)
-        button_cancel_selection.pressed.connect(lambda: self.animated_file_change_1(icon_way="", duration=200))
+        button_cancel_selection.pressed.connect(self.right_block_cleaner)
+        # button_cancel_selection.pressed.connect(lambda: self.animated_file_change_1(icon_way="", duration=200))
         self.button_cancel_selection = button_cancel_selection
         self.pushbutton_style_creator(pushbutton=button_cancel_selection)
 
@@ -521,6 +522,39 @@ class MMBody(QMainWindow):
         self.previous_button_index = pressed_button_index
 
 
+    # def video_block_creating(self, pressed_button_index: int) -> None:
+    #     back_widget = QWidget()
+    #     back_widget.setMaximumSize(600, 700)
+    #     back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
+    #
+    #     self.pressed_button_index = pressed_button_index
+    #
+    #     layout = QVBoxLayout(back_widget)
+    #     spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
+    #     layout.addItem(spacer)
+    #
+    #     self.video_widget = QVideoWidget(back_widget)
+    #     self.media_player = QMediaPlayer(self.video_widget, QMediaPlayer.VideoSurface)
+    #
+    #     horizontal_layout = QHBoxLayout()
+    #     self.video_slider = QSlider(Qt.Orientation.Horizontal)
+    #     self.video_slider.sliderMoved.connect(self.set_position)
+    #     self.media_player.positionChanged.connect(self.update_slider)
+    #     horizontal_layout.addWidget(self.video_slider)
+    #     play_button = QPushButton()
+    #     play_button.pressed.connect(self.play_button_pressed)
+    #     self.pushbutton_style_creator(play_button)
+    #     horizontal_layout.addWidget(play_button)
+    #     layout.addLayout(horizontal_layout)
+    #
+    #     horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index=pressed_button_index)
+    #     layout.addLayout(horizontal_buttons_layout)
+    #
+    #     self.start_media = True
+    #     self.ui.verticalLayout_right_window.addWidget(back_widget)
+    #     self.pressed_button_index = pressed_button_index
+
+
     def video_block_creating(self, pressed_button_index: int) -> None:
         back_widget = QWidget()
         back_widget.setMaximumSize(600, 700)
@@ -532,14 +566,19 @@ class MMBody(QMainWindow):
         spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addItem(spacer)
 
-        self.video_widget = QVideoWidget(back_widget)
-        self.media_player = QMediaPlayer(self.video_widget, QMediaPlayer.VideoSurface)
+        self.video_item = QGraphicsVideoItem()
+        self.scene = QGraphicsScene(back_widget)
+        self.scene.addItem(self.video_item)
+        graphics_view = QGraphicsView(self.scene, back_widget)
+        graphics_view.setGeometry(0, 0, 300, 300)
+        # graphics_view.setMinimumSize(QSize(250, 170))
+        self.media_player = QMediaPlayer(back_widget, QMediaPlayer.VideoSurface)
+        self.media_player.setVideoOutput(self.video_item)
 
         horizontal_layout = QHBoxLayout()
-        self.video_slider = QSlider(Qt.Orientation.Horizontal)
-        self.video_slider.sliderMoved.connect(self.set_position)
-        self.media_player.positionChanged.connect(self.update_slider)
-        horizontal_layout.addWidget(self.video_slider)
+        # self.video_slider = QSlider(Qt.Orientation.Horizontal)
+        # self.video_slider.sliderMoved.connect(self.set_position)
+        # horizontal_layout.addWidget(self.video_slider)
         play_button = QPushButton()
         play_button.pressed.connect(self.play_button_pressed)
         self.pushbutton_style_creator(play_button)
@@ -552,6 +591,17 @@ class MMBody(QMainWindow):
         self.start_media = True
         self.ui.verticalLayout_right_window.addWidget(back_widget)
         self.pressed_button_index = pressed_button_index
+
+        # layout = QVBoxLayout()
+        # layout.addWidget(graphics_view)
+        # self.setLayout(layout)
+        # self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
+        # self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
+        #
+        # self.media_player.play()
+        # # self.media_player.stop()
+        #
+        # horizontal_layout.addLayout(layout)
 
 
     def set_position(self, position: int) -> None:
@@ -922,7 +972,7 @@ class MMBody(QMainWindow):
             object_ = self.right_window_label
         # File is video
         else:
-            object_ = self.video_widget
+            object_ = self.scene
 
         return object_
 
@@ -1194,12 +1244,11 @@ class MMBody(QMainWindow):
             file_way = self.paths_to_all_files_list[self.pressed_button_index]
             self.changing_video_size_and_position(file_way=file_way)
 
-            self.media_player.setVideoOutput(self.video_widget)
             self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
             self.media_player.play()
             self.media_player.pause()
 
-            media_object = self.video_widget
+            media_object = self.scene
 
         opacity_effect = QGraphicsOpacityEffect(media_object)
         media_object.setGraphicsEffect(opacity_effect)
