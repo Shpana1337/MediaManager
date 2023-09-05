@@ -60,10 +60,11 @@ class MMBody(QMainWindow):
         self.list_widget_mass = []
         self.add_buttons_mass = []
         self.photo_button_mass = []
+        self.previous_tags_mass = []
         self.delete_buttons_mass = []
         self.selected_files_mass = []
         self.button_is_photo_mass = []
-        self.previous_tags_mass = []
+        self.previous_window_size = ()
         self.selected_files_way_mass = []
         self.paths_to_all_files_list = []
         self.shadow_effect = AnimatedShadowEffect()
@@ -81,6 +82,7 @@ class MMBody(QMainWindow):
         self.db_init()
         self.window_resize(type_="start")
 
+        self.ui.tabWidget.currentChanged.connect(lambda: self.window_resize("change"))
         self.ui.pushbutton_open_folder.pressed.connect(self.open_folder)
 
 
@@ -312,7 +314,8 @@ class MMBody(QMainWindow):
     def change_cancelling(self) -> None:
         for _index in self.changed_tags_indexes_list:
             self.list_widget_mass[_index].clear()
-            self.list_widget_mass[_index].addItems(self.previous_tags_mass[_index])
+            for item in self.previous_tags_mass[_index]:
+                self.list_widget_mass[_index].addItem(item.capitalize())
 
         self.cancel_button.setEnabled(False)
         self.save_button.setEnabled(False)
@@ -1051,7 +1054,7 @@ class MMBody(QMainWindow):
             self.animation.start(QPropertyAnimation.DeleteWhenStopped)
         # Переключение между вкладками программы
         elif type_ == "change":
-            # Проверка на несохраненные значения в окне настроек  
+            # Проверка на несохраненные значения в окне настроек
             if self.LastIndex == 1 and self.ui.pushButton_save_settings.isEnabled():
                 error_message = QMessageBox()
                 error_message.setWindowTitle('Изменение настроек')
@@ -1061,19 +1064,32 @@ class MMBody(QMainWindow):
 
                 result = error_message.exec_()
 
-                if result == QMessageBox.Yes: # Изменить сохранение настроек на QSettings
-                    self.save_settings()
-                else:
-                    self.ui.settings_init() #### Проверить!!!
+                # if result == QMessageBox.Yes: # Изменить сохранение настроек на QSettings
+                #     self.save_settings()
+                # else:
+                #     self.ui.settings_init() #### Проверить!!!
+            # Открытие окна настроек
+            if tab_index == 1:
+                self.move_window(xy_shift=((self.width() - 600) // 2,
+                                           (self.height() - 350) // 2),
+                                 new_size=(600, 350), type_="left_window_opening")
+
+            else:
+                self.move_window(xy_shift=((self.width() - self.previous_window_size[0]) // 2,
+                                           (self.height() - self.previous_window_size[1]) // 2),
+                                 new_size=(self.previous_window_size[0], self.previous_window_size[1]),
+                                 type_="left_window_opening")
+
+            self.previous_window_size = (self.width(), self.height())
 
         elif type_ == "left_window_opening": # Добавить зависимость от кол-ва фотографий в папке
-            self.move_window(xy_shift=((application.size().width() - 600) // 2,
-                                       (application.size().height() - 700) // 2),
+            self.move_window(xy_shift=((self.width() - 600) // 2,
+                                       (self.height() - 700) // 2),
                              new_size=(600, 700), type_="left_window_opening")
 
         elif type_ == "right_window_opening": # Добавить зависимость от кол-ва фотографий в папке
-            self.move_window(xy_shift=((application.size().width() - 1250) // 2,
-                                       (application.size().height() - 730) // 2),
+            self.move_window(xy_shift=((self.width() - 1250) // 2,
+                                       (self.height() - 730) // 2),
                              new_size=(1250, 730), type_="right_window_opening")
 
         self.LastIndex = tab_index
