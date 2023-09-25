@@ -20,7 +20,7 @@ from screeninfo import get_monitors
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem, QVideoWidget
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QRect
+from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QRect, QSizeF
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
     QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
     QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, \
@@ -45,8 +45,8 @@ class MMBody(QMainWindow):
         self.cancel_button = None
         self.move_animation = None
         self.opacity_animation = None
-        self.pressed_button_index = None
         self.button_cancel_selection = None
+        self.back_widget = QWidget()
         self.video_slider = QSlider()
         self.right_window_label = QLabel()
         self.video_widget = QVideoWidget()
@@ -54,6 +54,7 @@ class MMBody(QMainWindow):
         self.db_name = ""
         self.selection_type = 1
         self.first_pressed_index = -1
+        self.pressed_button_index = 0
         self.second_pressed_index = -1
         self.previous_button_index = 0
         self.line_edits_mass = []
@@ -70,7 +71,6 @@ class MMBody(QMainWindow):
         self.shadow_effect = AnimatedShadowEffect()
         self.changed_tags_indexes_list = set()
         self.icons_cache_folder = Path('icons_cache')
-        self.start_media = True
         self.right_window_is_open = False
 
         self.button_stylesheet_settings = "QPushButton {background-color: #c7c7c7; " \
@@ -284,7 +284,8 @@ class MMBody(QMainWindow):
         button_cancel_selection.setMinimumSize(65, 25)
         button_cancel_selection.setMaximumSize(600, 25)
         button_cancel_selection.setEnabled(False)
-        button_cancel_selection.pressed.connect(self.right_block_cleaner)
+        button_cancel_selection.pressed.connect(lambda: self.animated_file_change_1(icon_way= "",
+                                                                                    duration=200))
         self.button_cancel_selection = button_cancel_selection
         self.pushbutton_style_creator(pushbutton=button_cancel_selection)
 
@@ -467,36 +468,38 @@ class MMBody(QMainWindow):
 
 
     def video_block_creating(self, pressed_button_index: int) -> None:
-        back_widget = QWidget()
-        back_widget.setMaximumSize(600, 700)
-        back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
+        self.back_widget = QWidget()
+        self.back_widget.setMaximumSize(600, 700)
+        self.back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
 
         self.pressed_button_index = pressed_button_index
 
-        layout = QVBoxLayout(back_widget)
+        layout = QVBoxLayout(self.back_widget)
         spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addItem(spacer)
 
         self.video_item = QGraphicsVideoItem()
-        self.scene = QGraphicsScene(back_widget)
+        self.scene = QGraphicsScene(self.back_widget)
         self.scene.addItem(self.video_item)
-        graphics_view = QGraphicsView(self.scene, back_widget)
-        graphics_view.setGeometry(0, 0, 300, 300)
-        self.media_player = QMediaPlayer(back_widget, QMediaPlayer.VideoSurface)
+        # self.video_item.setSize(QSizeF(600, 400))
+        graphics_view = QGraphicsView(self.scene, self.back_widget)
+        # graphics_view.setGeometry(0, 0,
+        #                           610, 400)
+        self.graphics_view = graphics_view
+        self.media_player = QMediaPlayer(self.back_widget, QMediaPlayer.VideoSurface)
         self.media_player.setVideoOutput(self.video_item)
 
         horizontal_layout = QHBoxLayout()
-        play_button = QPushButton()
-        play_button.pressed.connect(self.play_button_pressed)
-        self.pushbutton_style_creator(play_button)
-        horizontal_layout.addWidget(play_button)
+        self.play_button = QPushButton()
+        self.play_button.pressed.connect(self.play_button_pressed)
+        self.pushbutton_style_creator(self.play_button)
+        horizontal_layout.addWidget(self.play_button)
         layout.addLayout(horizontal_layout)
 
         horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index=pressed_button_index)
         layout.addLayout(horizontal_buttons_layout)
 
-        self.start_media = True
-        self.ui.verticalLayout_right_window.addWidget(back_widget)
+        self.ui.verticalLayout_right_window.addWidget(self.back_widget)
         self.pressed_button_index = pressed_button_index
 
 
@@ -509,12 +512,10 @@ class MMBody(QMainWindow):
 
 
     def play_button_pressed(self) -> None:
-        if self.start_media:
-            self.media_player.play()
-            self.start_media = False
-        else:
+        if self.media_player.state() == QMediaPlayer.PlayingState:
             self.media_player.pause()
-            self.start_media = True
+        else:
+            self.media_player.play()
 
 
     def arrow_layout_creating(self, pressed_button_index: int) -> QWidget:
@@ -1135,23 +1136,36 @@ class MMBody(QMainWindow):
             media_object = self.right_window_label
         # File is video
         else:
+            view_offset = 2
             file_way = self.paths_to_all_files_list[self.pressed_button_index]
-            self.changing_video_size_and_position(file_way=file_way)
+            video_size = self.calculate_video_size(file_way=file_way)
+            widget_size = self.back_widget.size()
 
+            self.changing_video_size_and_position(file_way=file_way)
             self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
+            self.video_item.setSize(QSizeF(video_size[0], video_size[1]))
+            # Нужна регулировка по высоте после того, как доделаю виджеты
+            # для управления мультимедиа.!!!!!
+            self.graphics_view.setGeometry((widget_size.width() - (video_size[0] + view_offset)) // 2,
+                                           widget_size.height() // 2 - video_size[1] // 2,
+                                           video_size[0] + view_offset,
+                                           video_size[1] + view_offset)
+
+            self.back_widget.setMinimumSize(self.back_widget.size())
             self.media_player.play()
             self.media_player.pause()
 
-            media_object = self.scene
+        # Не фича, а баг
+        if self.button_is_photo_mass[self.pressed_button_index]:
+            opacity_effect = QGraphicsOpacityEffect(media_object)
+            media_object.setGraphicsEffect(opacity_effect)
+            self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
+            self.opacity_animation.setDuration(200)
+            self.opacity_animation.setStartValue(0)
+            self.opacity_animation.setEndValue(1)
+            self.opacity_animation.start()
+            self.opacity_animation.finished.connect(lambda: self.media_shadow_effect_init(media_object))
 
-        opacity_effect = QGraphicsOpacityEffect(media_object)
-        media_object.setGraphicsEffect(opacity_effect)
-        self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
-        self.opacity_animation.setDuration(200)
-        self.opacity_animation.setStartValue(0)
-        self.opacity_animation.setEndValue(1)
-        self.opacity_animation.start()
-        self.opacity_animation.finished.connect(lambda: self.media_shadow_effect_init(media_object))
 
 
     def changing_video_size_and_position(self, file_way: str) -> None:
@@ -1188,6 +1202,24 @@ class MMBody(QMainWindow):
                                  "QPushButton::hover {background-color: #dedede;}"
                                  "QPushButton::pressed {background-color: #dadada;}")
         self.set_shadow_effect(object_=pushbutton)
+
+
+    @staticmethod
+    def calculate_video_size(file_way: str) -> tuple:
+        offset = 10
+        max_width = 600 - offset
+        max_height = 400 - offset
+
+        video = cv2.VideoCapture(file_way)
+        width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        aspect_ratio = (width / height)
+        # Горизонтальное видео
+        if aspect_ratio >= 1:
+            return max_width, int(max_width // aspect_ratio)
+        # Вертикальное видео
+        else:
+            return int(max_height // aspect_ratio), max_height
 
 
     @staticmethod
