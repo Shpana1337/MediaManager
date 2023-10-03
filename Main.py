@@ -160,7 +160,8 @@ class MMBody(QMainWindow):
         list_widget = QListWidget()
         self.set_shadow_effect(object_=list_widget)
         button_delete_tag = QPushButton()
-        button_delete_tag.setText('-')
+        button_delete_tag.setIcon(QIcon("icons/minusIcon.png"))
+        button_delete_tag.setIconSize(QSize(10, 10))
         self.pushbutton_style_creator(pushbutton=button_delete_tag)
         button_delete_tag.setMinimumSize(50, 25)
 
@@ -168,7 +169,8 @@ class MMBody(QMainWindow):
         horizontal_layout_for_line_edit = QHBoxLayout()
 
         button_add_tag = QPushButton()
-        button_add_tag.setText('+')
+        button_add_tag.setIcon(QIcon("icons/plusIcon.png"))
+        button_add_tag.setIconSize(QSize(10, 10))
         self.pushbutton_style_creator(pushbutton=button_add_tag)
         button_add_tag.setMinimumSize(65, 25)
 
@@ -277,6 +279,7 @@ class MMBody(QMainWindow):
         combo_box.addItem('Одиночное выделение')
         combo_box.addItem('Выделение "от и до"')
         combo_box.addItem('Выборочное выделение')
+        combo_box.setStyleSheet("QComboBox {color: white}")
         combo_box.currentIndexChanged.connect(self.selection_type_change)
 
         button_cancel_selection = QPushButton()
@@ -332,8 +335,6 @@ class MMBody(QMainWindow):
             for i in self.changed_tags_indexes_list:
                 _file_path = self.paths_to_all_files_list[i]
                 _file_id = stat(_file_path, follow_symlinks=False).st_ino
-                _device_id = stat(_file_path, follow_symlinks=False).st_dev
-                _disk_name = _file_path.split(":/")[0][-1]
                 # Добавление новых
                 for tag in current_tags_list[i]:
                     if tag not in self.previous_tags_mass[i]:
@@ -349,6 +350,8 @@ class MMBody(QMainWindow):
                             _tag_index = _tag_index[0]
                         # Windows
                         if self.db_name.startswith("win"):
+                            _disk_name = _file_path.split(":/")[0][-1]
+
                             if not cursor.execute("SELECT FROM media_files WHERE disk_name = ? AND file_id = ? "
                                                   "AND tag_index = ?", (_disk_name, _file_id, _tag_index)).fetchone():
                                 cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
@@ -356,6 +359,8 @@ class MMBody(QMainWindow):
                                 cursor.execute("UPDATE tag_indexes SET count = count + 1 WHERE tag = ?", (tag,))
                         # Linux/Mac OS
                         else:
+                            _device_id = stat(_file_path, follow_symlinks=False).st_dev
+
                             if not cursor.execute("SELECT * FROM media_files WHERE device_id = ? AND file_id = ? "
                                                   "AND tag_index = ?", (_device_id, _file_id, _tag_index)).fetchone():
                                 cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
@@ -1197,10 +1202,10 @@ class MMBody(QMainWindow):
 
 
     def pushbutton_style_creator(self, pushbutton: QWidget) -> None:
-        pushbutton.setStyleSheet("QPushButton {background-color: #c7c7c7; "
+        pushbutton.setStyleSheet("QPushButton {background-color: #5C5C5C; "
                                  "border-radius: 7px; border: 1px solid #8a8a8a}"
-                                 "QPushButton::hover {background-color: #dedede;}"
-                                 "QPushButton::pressed {background-color: #dadada;}")
+                                 "QPushButton::hover {background-color: #525252;}"
+                                 "QPushButton::pressed {background-color: #484848;}")
         self.set_shadow_effect(object_=pushbutton)
 
 
