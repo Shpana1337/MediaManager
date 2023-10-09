@@ -12,7 +12,6 @@ import sqlite3
 from sys import platform
 from pathlib import Path
 from os import remove, stat
-from collections import Counter
 from math import ceil
 
 import cv2
@@ -23,11 +22,13 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QRect, QSizeF
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
     QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
-    QListWidgetItem, QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, \
+    QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, \
     QGraphicsOpacityEffect, QGraphicsScene, QGraphicsView, QSlider
 
 from ui import Ui_MainWindow
 from AnimatedEffects import AnimatedShadowEffect
+from WorkWithTags import WorkWithTags
+from Animations import WidgetsAnimations
 
 
 class MMBody(QMainWindow):
@@ -47,10 +48,15 @@ class MMBody(QMainWindow):
         self.opacity_animation = None
         self.button_cancel_selection = None
         self.back_widget = QWidget()
+        self.scene = QGraphicsScene()
         self.video_slider = QSlider()
+        self.play_button = QPushButton()
         self.right_window_label = QLabel()
         self.video_widget = QVideoWidget()
         self.media_player = QMediaPlayer()
+        self.graphics_view = QGraphicsView()
+        self.video_item = QGraphicsVideoItem()
+        self.shadow_effect = AnimatedShadowEffect()
         self.db_name = ""
         self.selection_type = 1
         self.first_pressed_index = -1
@@ -68,7 +74,6 @@ class MMBody(QMainWindow):
         self.previous_window_size = ()
         self.selected_files_way_mass = []
         self.paths_to_all_files_list = []
-        self.shadow_effect = AnimatedShadowEffect()
         self.changed_tags_indexes_list = set()
         self.icons_cache_folder = Path('icons_cache')
         self.right_window_is_open = False
@@ -116,8 +121,8 @@ class MMBody(QMainWindow):
         if files_was_founded:
             self.upper_lower_layouts_creating()
 
-        self.opening_adding_tags()
-        self.previous_tags_mass = self.all_tags_mass_creating()
+        WorkWithTags.opening_adding_tags(self=self)
+        self.previous_tags_mass = WorkWithTags.all_tags_mass_creating(self=self)
         self.window_resize(type_="left_window_opening")
 
 
@@ -201,8 +206,8 @@ class MMBody(QMainWindow):
 
         pressed_button_index = self.add_buttons_mass.index(button_add_tag)
 
-        button_add_tag.pressed.connect(lambda: self.add_tag(index_=pressed_button_index))
-        button_delete_tag.pressed.connect(lambda: self.delete_tag(index_=pressed_button_index))
+        button_add_tag.pressed.connect(lambda: WorkWithTags.add_tag(self=self, index_=pressed_button_index))
+        button_delete_tag.pressed.connect(lambda: WorkWithTags.delete_tag(self=self, index_=pressed_button_index))
 
 
     def get_first_video_frame(self, file_way: str) -> str:
@@ -221,42 +226,6 @@ class MMBody(QMainWindow):
             cv2.imwrite(f"{self.icons_cache_folder}/{len(self.photo_button_mass)}.jpg", icon)
 
         return f"{self.icons_cache_folder}/{len(self.photo_button_mass)}.jpg"
-
-
-    def opening_adding_tags(self) -> None:
-        """
-        Функция добавляет ко всем файлам теги, если они были ранее загружены в базу данных.
-        Вызывается только после открытия папки с медиафайлами.
-        """
-        with sqlite3.connect(self.db_name) as db:
-            cursor = db.cursor()
-            _file_index = 0
-
-            for file_way in self.paths_to_all_files_list:
-                _file_id = stat(file_way, follow_symlinks=False).st_ino
-                _device_id = stat(file_way, follow_symlinks=False).st_dev
-                # Linux/Mac OS
-                if self.db_name.startswith("lin"):
-                    tag_indexes = cursor.execute("SELECT tag_index FROM media_files WHERE device_id = ? "
-                                                 "AND file_id = ?", (_device_id, _file_id)).fetchall()
-                # Windows
-                else:
-                    _disk_name = file_way.split(":/")[0][-1]
-                    tag_indexes = cursor.execute("SELECT tag_index FROM media_files WHERE file_id = ? "
-                                                 "AND disk_name = ?", (_file_id, _disk_name)).fetchall()
-
-                if tag_indexes:
-                    for el in tag_indexes:
-                        index_ = el[0]
-                        tag = cursor.execute("SELECT tag from tag_indexes WHERE tag_index = ?", (index_,)).fetchone()
-
-                        if tag:
-                            tag = tag[0]
-                            self.list_widget_mass[_file_index].addItem(tag.capitalize())
-                        else:
-                            raise sqlite3.Error
-
-                _file_index += 1
 
 
     def selection_type_change(self, value: int) -> None:
@@ -287,8 +256,9 @@ class MMBody(QMainWindow):
         button_cancel_selection.setMinimumSize(65, 25)
         button_cancel_selection.setMaximumSize(600, 25)
         button_cancel_selection.setEnabled(False)
-        button_cancel_selection.pressed.connect(lambda: self.animated_file_change_1(icon_way= "",
-                                                                                    duration=200))
+        button_cancel_selection.pressed.connect(lambda: WidgetsAnimations.animated_file_change_1(self=self,
+                                                                                                 icon_way= "",
+                                                                                                 duration=200))
         self.button_cancel_selection = button_cancel_selection
         self.pushbutton_style_creator(pushbutton=button_cancel_selection)
 
@@ -299,7 +269,7 @@ class MMBody(QMainWindow):
         save_button.setText('Сохранить изменения')
         save_button.setMinimumSize(65, 25)
         save_button.setEnabled(False)
-        save_button.pressed.connect(self.save_tags)
+        save_button.pressed.connect(lambda: WorkWithTags.save_tags(self=self))
         self.save_button = save_button
         self.pushbutton_style_creator(pushbutton=save_button)
 
@@ -323,85 +293,6 @@ class MMBody(QMainWindow):
 
         self.cancel_button.setEnabled(False)
         self.save_button.setEnabled(False)
-
-
-    def save_tags(self) -> None:
-        current_tags_list = self.all_tags_mass_creating()
-        max_index = self.max_tag_index()
-
-        with sqlite3.connect(self.db_name) as db:
-            cursor = db.cursor()
-
-            for i in self.changed_tags_indexes_list:
-                _file_path = self.paths_to_all_files_list[i]
-                _file_id = stat(_file_path, follow_symlinks=False).st_ino
-                # Добавление новых
-                for tag in current_tags_list[i]:
-                    if tag not in self.previous_tags_mass[i]:
-                        _tag_index = cursor.execute("SELECT tag_index FROM tag_indexes WHERE tag = ?",
-                                                    (tag,)).fetchone()
-                        # Присваивание индекса новому тегу
-                        if not _tag_index:
-                            cursor.execute("INSERT INTO tag_indexes VALUES(?, ?, ?)", (max_index + 1, tag, 0))
-                            max_index += 1
-                            _tag_index = max_index
-
-                        else:
-                            _tag_index = _tag_index[0]
-                        # Windows
-                        if self.db_name.startswith("win"):
-                            _disk_name = _file_path.split(":/")[0][-1]
-
-                            if not cursor.execute("SELECT FROM media_files WHERE disk_name = ? AND file_id = ? "
-                                                  "AND tag_index = ?", (_disk_name, _file_id, _tag_index)).fetchone():
-                                cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
-                                               (_disk_name, _file_id, _tag_index))
-                                cursor.execute("UPDATE tag_indexes SET count = count + 1 WHERE tag = ?", (tag,))
-                        # Linux/Mac OS
-                        else:
-                            _device_id = stat(_file_path, follow_symlinks=False).st_dev
-
-                            if not cursor.execute("SELECT * FROM media_files WHERE device_id = ? AND file_id = ? "
-                                                  "AND tag_index = ?", (_device_id, _file_id, _tag_index)).fetchone():
-                                cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
-                                               (_device_id, _file_id, _tag_index))
-                                cursor.execute("UPDATE tag_indexes SET count = count + 1 WHERE tag = ?", (tag,))
-
-                db.commit()
-                # Очистка удаленных тегов
-                for old_tag in self.previous_tags_mass[i]:
-                    if old_tag not in current_tags_list[i]:
-                        index_and_count = cursor.execute("SELECT tag_index, count FROM tag_indexes WHERE tag = ?",
-                                                         (old_tag,)).fetchone()
-
-                        if not index_and_count:
-                            raise sqlite3.Error
-
-                        cursor.execute("DELETE FROM media_files WHERE device_id = ? AND file_id = ? AND tag_index = ?",
-                                       (_device_id, _file_id, index_and_count[0]))
-
-                        if index_and_count[1] - 1 == 0:
-                            cursor.execute("DELETE FROM tag_indexes WHERE tag = ?", (old_tag,))
-
-                        else:
-                            cursor.execute("UPDATE tag_indexes SET count = count - 1 WHERE tag = ?", (old_tag,))
-
-            db.commit()
-
-        self.cancel_button.setEnabled(False)
-        self.save_button.setEnabled(False)
-        self.previous_tags_mass = self.all_tags_mass_creating()
-
-
-    def max_tag_index(self) -> int:
-        with sqlite3.connect(self.db_name) as db:
-            cursor = db.cursor()
-            max_index = cursor.execute("SELECT MAX(tag_index) FROM tag_indexes").fetchone()[0]
-
-            if max_index:
-                return max_index
-            else:
-                return 0
 
 
     def right_block_cleaner(self) -> None:
@@ -501,7 +392,7 @@ class MMBody(QMainWindow):
         horizontal_layout.addWidget(self.play_button)
         layout.addLayout(horizontal_layout)
 
-        horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index=pressed_button_index)
+        horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index)
         layout.addLayout(horizontal_buttons_layout)
 
         self.ui.verticalLayout_right_window.addWidget(self.back_widget)
@@ -530,15 +421,19 @@ class MMBody(QMainWindow):
         left_arrow.setText('<<')
         left_arrow.setMinimumSize(65, 25)
         self.left_arrow = left_arrow
+        # self.left_arrow.setStyleSheet("QPushButton {background-color: rgba(255, 255, 255, 0); "
+        #                               "border: none;}"
+        #                               "QPushButton::hover {border: 1px solid black; "
+        #                               "border-radius: 7px}")
         self.pushbutton_style_creator(left_arrow)
-        left_arrow.pressed.connect(lambda: self.arrow_button_pressing(side="left"))
+        left_arrow.pressed.connect(lambda: self.arrow_button_pressing("left"))
 
         right_arrow = QPushButton()
         right_arrow.setText('>>')
         right_arrow.setMinimumSize(65, 25)
         self.right_arrow = right_arrow
-        self.pushbutton_style_creator(pushbutton=right_arrow)
-        right_arrow.pressed.connect(lambda: self.arrow_button_pressing(side="right"))
+        self.pushbutton_style_creator(right_arrow)
+        right_arrow.pressed.connect(lambda: self.arrow_button_pressing("right"))
 
         if pressed_button_index == 0:
             left_arrow.setEnabled(False)
@@ -553,18 +448,8 @@ class MMBody(QMainWindow):
 
 
     def right_window_changing(self, pressed_button_index: int) -> None:
-        """
-        :param self.previous_button_index: индекс предпоследней нажатой кнопки.
-        :param selection_type: способ выделения фотографий (1 - одиночное, 2 - от и до, 3 - выборочное).
-        :param selected_photo_mass: массив с указателями на кнопки выбранных фотографий.
-        :param ready_to_create_block: флаг = True, когда выполнятся все условия для открытия блока
-                                      для одного из вариантов выделения.
-        :param pressed_button_index: Индекс нажатой кнопки.
-        :param first_pressed_index: индекс первого нажатого элемента.
-        :param second_pressed_index: индекс второго нажатого элемента.
-        """
         if not self.right_window_is_open:
-            self.right_window_creating(pressed_button_index=pressed_button_index)
+            self.right_window_creating(pressed_button_index)
             return
 
         if self.selection_type == 1:
@@ -580,8 +465,9 @@ class MMBody(QMainWindow):
                     "QPushButton::hover {background-color: #dedede;}"
                     "QPushButton::pressed {background-color: #dadada;}")
 
-                self.animated_file_change_1(icon_way=self.paths_to_all_files_list[pressed_button_index],
-                                            duration=100)
+                WidgetsAnimations.animated_file_change_1(self=self,
+                                                         icon_way=self.paths_to_all_files_list[pressed_button_index],
+                                                         duration=100)
                 self.previous_button_index = pressed_button_index
 
                 if pressed_button_index == 0:
@@ -755,7 +641,7 @@ class MMBody(QMainWindow):
                 self.selected_files_way_mass = [self.paths_to_all_files_list[self.previous_button_index - 1]]
                 self.previous_button_index -= 1
 
-                self.animated_file_change_1(icon_way=icon_way, duration=100)
+                WidgetsAnimations.animated_file_change_1(self=self, icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == 0:
                     self.left_arrow.setEnabled(False)
@@ -779,79 +665,13 @@ class MMBody(QMainWindow):
                 icon_way = self.paths_to_all_files_list[self.previous_button_index + 1]
                 self.previous_button_index += 1
 
-                self.animated_file_change_1(icon_way=icon_way, duration=100)
+                WidgetsAnimations.animated_file_change_1(self=self, icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == len(self.photo_button_mass) - 1:
                     self.right_arrow.setEnabled(False)
 
                 if not(self.left_arrow.isEnabled()):
                     self.left_arrow.setEnabled(True)
-
-
-    def animated_file_change_1(self, icon_way: str, duration: int) -> None:
-        object_ = self.defining_media_object()
-
-        self.shadow_effect_init(duration=duration)
-        self.shadow_effect.fading_animation_start()
-        self.shadow_effect.animation.finished.connect(lambda: self.animated_file_change_2(icon_way=icon_way,
-                                                                                          values=(1, 0),
-                                                                                          duration=duration,
-                                                                                          object_=object_))
-
-
-    def animated_file_change_2(self, icon_way: str, values: tuple, duration: int, object_: QWidget) -> None:
-        opacity_effect = QGraphicsOpacityEffect(object_)
-        object_.setGraphicsEffect(opacity_effect)
-        self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
-        self.opacity_animation.setDuration(duration)
-        self.opacity_animation.setStartValue(values[0])
-        self.opacity_animation.setEndValue(values[1])
-        self.opacity_animation.start()
-        # Функция вызвана нажатием кнопки "Отменить выделение"
-        if icon_way == "":
-            self.opacity_animation.finished.connect(self.right_block_cleaner)
-        # Функция вызвана от animated_file_change_1
-        elif values[0] == 1:
-            self.opacity_animation.finished.connect(lambda: self.animated_file_change_3(icon_way=icon_way,
-                                                                                        duration=duration,
-                                                                                        object_=object_))
-        # Функция вызвана от animated_file_change_3
-        else:
-            self.opacity_animation.finished.connect(lambda: self.animated_file_change_4(duration=duration,
-                                                                                        object_=object_))
-
-
-    def animated_file_change_3(self, icon_way: str, duration: int, object_: QWidget) -> None:
-        if type(object_) == QVideoWidget:
-            pass
-
-        elif type(object_) == QLabel:
-            pixmap = QPixmap(icon_way).scaled(600, 400, aspectRatioMode=Qt.KeepAspectRatioByExpanding)
-            object_.setPixmap(pixmap)
-
-        else:
-            raise TypeError
-
-        self.animated_file_change_2(icon_way=icon_way, values=(0, 1), duration=duration, object_=object_)
-
-
-    def animated_file_change_4(self, duration: int, object_: QWidget) -> None:
-        self.shadow_effect_init(duration=duration)
-        object_.setGraphicsEffect(self.shadow_effect)
-        self.shadow_effect.rise_animation_start()
-
-
-    def animated_opacity_change(self, values: tuple, duration: int, object_: QWidget) -> None:
-        """
-        Функция плавно меняет прозрачность заданного на вход объекта.
-        """
-        opacity_effect = QGraphicsOpacityEffect(object_)
-        object_.setGraphicsEffect(opacity_effect)
-        self.opacity_animation = QPropertyAnimation(opacity_effect, b"opacity")
-        self.opacity_animation.setDuration(duration)
-        self.opacity_animation.setStartValue(values[0])
-        self.opacity_animation.setEndValue(values[1])
-        self.opacity_animation.start()
 
 
     def shadow_effect_init(self, duration: int) -> None:
@@ -875,121 +695,6 @@ class MMBody(QMainWindow):
         return object_
 
 
-    def add_tag(self, index_: int) -> None:
-        """
-        Функция добавляет тег(и) в list widgets.
-
-        :param index_: Индекс измененного медиафайла. Равен -1, когда пользователь хочет добавить тег нажатием 'Enter'.
-        """
-        # Нажатие на кнопку +
-        if index_ != -1:
-            line_edit_text = self.line_edits_mass[index_].text()
-            self.changed_tags_indexes_list.add(index_)
-
-            if line_edit_text:
-                already_exist_tags = []
-
-                for i in range(self.list_widget_mass[index_].count()):
-                    already_exist_tags.append(self.list_widget_mass[index_].item(i).text().lower())
-
-                line_edit_text = line_edit_text.split(',')
-                line_edit_text = list(set(line_edit_text))
-
-                if already_exist_tags:
-                    for tag in line_edit_text:
-                        tag = tag.strip()
-
-                        if tag != ' ' and tag != '' and tag.lower() not in already_exist_tags:
-                            self.list_widget_mass[index_].addItem(tag)
-
-                else:
-                    for tag in line_edit_text:
-                        tag = tag.strip()
-
-                        if tag != ' ' and tag != '':
-                            self.list_widget_mass[index_].addItem(tag)
-
-                self.line_edits_mass[index_].clear()
-        # Функция вызвана нажатием кнопки Enter
-        else:
-            for i in range(len(self.line_edits_mass)):
-                if self.line_edits_mass[i].text() != '':
-                    self.changed_tags_indexes_list.add(i)
-                    self.add_tag(index_=i)
-            return
-
-        self.previous_and_present_tags_equal_test()
-
-
-    def delete_tag(self, index_: int) -> None:
-        """
-        Функция удаляет тег(и) из list widgets.
-
-        :param index_: Индекс измененного медиафайла.
-        """
-        a = self.list_widget_mass[index_].selectedIndexes()
-        _selected_index = self.list_widget_mass[index_].count() - 1
-        _items_mass = []
-
-        for i in a:
-            _selected_index = i.row()
-
-        # Очистка и обратное заполнение listWidget
-        for i in range(self.list_widget_mass[index_].count()):
-            if i != _selected_index:
-                item = self.list_widget_mass[index_].item(i)
-                name = item.text()
-                foreground = item.foreground()
-                _items_mass.append([name, foreground])
-
-        self.list_widget_mass[index_].clear()
-
-        for i in range(len(_items_mass)):
-            new_item = QListWidgetItem()
-            new_item.setText(_items_mass[i][0])
-            new_item.setForeground(_items_mass[i][1])
-            self.list_widget_mass[index_].addItem(new_item)
-
-        self.changed_tags_indexes_list.add(index_)
-        self.previous_and_present_tags_equal_test()
-
-
-    def previous_and_present_tags_equal_test(self) -> None:
-        present_tags = self.all_tags_mass_creating()
-        is_equal = True
-
-        for i in self.changed_tags_indexes_list:
-            # Проверка на содержание одинаковых элементов
-            if Counter(present_tags[i]) != Counter(self.previous_tags_mass[i]):
-                if not self.save_button.isEnabled():
-                    self.save_button.setEnabled(True)
-                    self.cancel_button.setEnabled(True)
-
-                is_equal = False
-                break
-
-        if is_equal:
-            self.save_button.setEnabled(False)
-            self.cancel_button.setEnabled(False)
-
-
-    def all_tags_mass_creating(self) -> list:
-        """
-        :return: Двумерный массив со всеми тегами.
-        """
-        all_tags_mass = []
-
-        for i in range(len(self.list_widget_mass)):
-            _mass = []
-            if self.list_widget_mass[i].count() != 0:
-                for j in range(self.list_widget_mass[i].count()):
-                    _mass.append(self.list_widget_mass[i].item(j).text().lower())
-            # добавляем в двумерный массив либо пустые массивы, если в лв нет тегов, либо массив с элементами лв
-            all_tags_mass.append(_mass)
-
-        return all_tags_mass
-
-
     def layout_cleaner(self, layout: QWidget) -> None:
         """
         Функция полностью очищает содержимое заданного на вход layout.
@@ -1010,7 +715,7 @@ class MMBody(QMainWindow):
         # Главное окно с медиафайлами.
         if self.ui.tabWidget.currentIndex() == 0:
             if e.key() == Qt.Key_Return:
-                self.add_tag(index_=-1)
+                WorkWithTags.add_tag(self=self,index_=-1)
 
 
     def db_init(self) -> None:
@@ -1200,13 +905,13 @@ class MMBody(QMainWindow):
 
         self.shadow_effect.rise_animation_start()
 
-
-    def pushbutton_style_creator(self, pushbutton: QWidget) -> None:
+    @staticmethod
+    def pushbutton_style_creator(pushbutton: QWidget) -> None:
         pushbutton.setStyleSheet("QPushButton {background-color: #5C5C5C; "
-                                 "border-radius: 7px; border: 1px solid #8a8a8a}"
+                                 "border-radius: 7px;}"
                                  "QPushButton::hover {background-color: #525252;}"
                                  "QPushButton::pressed {background-color: #484848;}")
-        self.set_shadow_effect(object_=pushbutton)
+        # self.set_shadow_effect(object_=pushbutton)
 
 
     @staticmethod
