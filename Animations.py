@@ -14,15 +14,24 @@ class WidgetsAnimations:
 
         self.shadow_effect_init(duration=duration)
         self.shadow_effect.fading_animation_start()
-        # Активирована фотография.
+        # Активирована фотография
         if self.button_is_photo_mass[self.pressed_button_index]:
             self.shadow_effect.animation.finished.connect(
                 lambda: WidgetsAnimations.animated_file_change_2(self=self, icon_way=icon_way,
                                                                  values=(1, 0), duration=duration,
                                                                  object_=object_))
-        # Активировано видео.
+        # Активировано видео
         else:
-            self.shadow_effect.animation.finished.connect(self.right_block_cleaner)
+            # Функция вызвана нажатием кнопки "Отменить выделение"
+            if icon_way == "":
+                self.shadow_effect.animation.finished.connect(self.right_block_cleaner)
+            # Смена с видео на фотографию
+            elif self.button_is_photo_mass[self.paths_to_all_files_list.index(icon_way)]:
+                WidgetsAnimations.from_photo_to_video_change(self)
+            else:
+                pass
+            # Дописать варианты со сменой с фото на видео,
+            # с видео на видео
 
 
     @staticmethod
@@ -70,6 +79,10 @@ class WidgetsAnimations:
         self.shadow_effect_init(duration=duration)
         object_.setGraphicsEffect(self.shadow_effect)
         self.shadow_effect.rise_animation_start()
+
+
+    def from_photo_to_video_change(self):
+        pass
 
 
     @staticmethod

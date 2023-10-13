@@ -29,6 +29,7 @@ from ui import Ui_MainWindow
 from AnimatedEffects import AnimatedShadowEffect
 from WorkWithTags import WorkWithTags
 from Animations import WidgetsAnimations
+from ArrowButton import ArrowButton
 
 
 class MMBody(QMainWindow):
@@ -40,8 +41,6 @@ class MMBody(QMainWindow):
 
         self.animation = None
         self.LastIndex = None
-        self.left_arrow = None
-        self.right_arrow = None
         self.save_button = None
         self.cancel_button = None
         self.move_animation = None
@@ -50,9 +49,11 @@ class MMBody(QMainWindow):
         self.back_widget = QWidget()
         self.scene = QGraphicsScene()
         self.video_slider = QSlider()
+        self.left_arrow = ArrowButton()
+        self.right_arrow = ArrowButton()
         self.play_button = QPushButton()
         self.right_window_label = QLabel()
-        self.video_widget = QVideoWidget()
+        # self.video_widget = QVideoWidget()
         self.media_player = QMediaPlayer()
         self.graphics_view = QGraphicsView()
         self.video_item = QGraphicsVideoItem()
@@ -130,9 +131,6 @@ class MMBody(QMainWindow):
         """
         Функция создает блоки с медиафайлами, тегами и кнопками.
 
-        :param ui.verticalLayout_11: Лэйаут scroll виджета.
-        :param horizontal_layout: Главный layout блока.
-        :param vertical_layout: Правый лэйаут блока с list widget и layout с кнопками.
         :param file_way: Путь к медиафайлу.
         :param file_is_photo: Булева переменная, показывает является ли файл фотографией.
         """
@@ -158,9 +156,9 @@ class MMBody(QMainWindow):
         horizontal_layout.addWidget(media_button)
         self.photo_button_mass.append(media_button)
         pressed_button_index = self.photo_button_mass.index(media_button)
-        media_button.pressed.connect(lambda: self.right_window_changing(pressed_button_index=pressed_button_index))
+        media_button.pressed.connect(lambda: self.right_window_changing(pressed_button_index))
 
-        ## Сборка правого лэйаута
+        ## Сборка правого лэйаута (с list widget и layout с кнопками)
         vertical_layout = QVBoxLayout()
         list_widget = QListWidget()
         self.set_shadow_effect(object_=list_widget)
@@ -320,26 +318,26 @@ class MMBody(QMainWindow):
 
         :param pressed_button_index: Индекс нажатого медиафайла.
         """
-        if self.right_block_create_test(pressed_button_index=pressed_button_index):
+        if self.right_block_create_test(pressed_button_index):
             print(f'Ready to create a block! Selection_type = {self.selection_type}')
             self.window_resize(type_="right_window_opening")
             # Создание блока с фотографией
             if self.button_is_photo_mass[pressed_button_index]:
-                self.photo_block_creating(pressed_button_index=pressed_button_index)
+                self.photo_block_creating(pressed_button_index)
             # Создание блока с видео
             else:
-                self.video_block_creating(pressed_button_index=pressed_button_index)
+                self.video_block_creating(pressed_button_index)
 
             self.right_window_is_open = True
             self.button_cancel_selection.setEnabled(True)
 
 
     def photo_block_creating(self, pressed_button_index: int) -> None:
-        back_widget = QWidget()
-        back_widget.setMaximumSize(600, 700)
-        back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
+        self.back_widget = QWidget()
+        self.back_widget.setMaximumSize(600, 700)
+        self.back_widget.setStyleSheet('QWidget {background-color: #f0f0f0; border: 1px solid #b9b9b9;}')
 
-        local_vertical_layout = QVBoxLayout(back_widget)
+        local_vertical_layout = QVBoxLayout(self.back_widget)
 
         label = QLabel()
         label.setText("")
@@ -356,10 +354,9 @@ class MMBody(QMainWindow):
         spacer = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Expanding)
         local_vertical_layout.addItem(spacer)
 
-        horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index=pressed_button_index)
+        self.arrow_buttons_creating()
 
-        local_vertical_layout.addLayout(horizontal_buttons_layout)
-        self.ui.verticalLayout_right_window.addWidget(back_widget)
+        self.ui.verticalLayout_right_window.addWidget(self.back_widget)
         self.previous_button_index = pressed_button_index
 
 
@@ -378,10 +375,9 @@ class MMBody(QMainWindow):
         self.scene = QGraphicsScene(self.back_widget)
         self.scene.addItem(self.video_item)
         # self.video_item.setSize(QSizeF(600, 400))
-        graphics_view = QGraphicsView(self.scene, self.back_widget)
+        self.graphics_view = QGraphicsView(self.scene, self.back_widget)
         # graphics_view.setGeometry(0, 0,
         #                           610, 400)
-        self.graphics_view = graphics_view
         self.media_player = QMediaPlayer(self.back_widget, QMediaPlayer.VideoSurface)
         self.media_player.setVideoOutput(self.video_item)
 
@@ -392,8 +388,8 @@ class MMBody(QMainWindow):
         horizontal_layout.addWidget(self.play_button)
         layout.addLayout(horizontal_layout)
 
-        horizontal_buttons_layout = self.arrow_layout_creating(pressed_button_index)
-        layout.addLayout(horizontal_buttons_layout)
+        # self.arrows_buttons_creating(layout=layout,
+        #                              pressed_button_index=pressed_button_index)
 
         self.ui.verticalLayout_right_window.addWidget(self.back_widget)
         self.pressed_button_index = pressed_button_index
@@ -414,37 +410,73 @@ class MMBody(QMainWindow):
             self.media_player.play()
 
 
-    def arrow_layout_creating(self, pressed_button_index: int) -> QWidget:
-        horizontal_buttons_layout = QHBoxLayout()
+    def arrow_buttons_creating(self) -> None:
+        self.left_arrow = ArrowButton(self.back_widget)
+        self.left_arrow.setIcon(QIcon("icons/left_arrow.png"))
+        self.left_arrow.setIconSize(QSize(25, 25))
+        self.left_arrow.setMinimumSize(65, 25)
+        self.left_arrow.pressed.connect(lambda: self.arrow_button_pressing("left"))
 
-        left_arrow = QPushButton()
-        left_arrow.setText('<<')
-        left_arrow.setMinimumSize(65, 25)
-        self.left_arrow = left_arrow
-        # self.left_arrow.setStyleSheet("QPushButton {background-color: rgba(255, 255, 255, 0); "
-        #                               "border: none;}"
-        #                               "QPushButton::hover {border: 1px solid black; "
-        #                               "border-radius: 7px}")
-        self.pushbutton_style_creator(left_arrow)
-        left_arrow.pressed.connect(lambda: self.arrow_button_pressing("left"))
+        self.right_arrow = ArrowButton(self.back_widget)
+        self.right_arrow.setIcon(QIcon("icons/right_arrow.png"))
+        self.right_arrow.setIconSize(QSize(25, 25))
+        self.right_arrow.setMinimumSize(65, 25)
+        self.right_arrow.pressed.connect(lambda: self.arrow_button_pressing("right"))
 
-        right_arrow = QPushButton()
-        right_arrow.setText('>>')
-        right_arrow.setMinimumSize(65, 25)
-        self.right_arrow = right_arrow
-        self.pushbutton_style_creator(right_arrow)
-        right_arrow.pressed.connect(lambda: self.arrow_button_pressing("right"))
+        arrow_buttons_stylesheet = ("QPushButton {"
+                                    "background-color: transparent;"
+                                    "border: none;"
+                                    "outline: none;}")
 
-        if pressed_button_index == 0:
-            left_arrow.setEnabled(False)
+        left_button_opacity_effect = QGraphicsOpacityEffect()
+        left_button_opacity_effect.setOpacity(0)
+        right_button_opacity_effect = QGraphicsOpacityEffect()
+        right_button_opacity_effect.setOpacity(0)
+        self.left_arrow.setStyleSheet(arrow_buttons_stylesheet)
+        # self.left_arrow.setGraphicsEffect(left_button_opacity_effect)
+        self.right_arrow.setStyleSheet(arrow_buttons_stylesheet)
+        # self.right_arrow.setGraphicsEffect(right_button_opacity_effect)
 
-        elif pressed_button_index == len(self.photo_button_mass) - 1:
-            right_arrow.setEnabled(False)
+        # if pressed_button_index == 0:
+        #     left_arrow.setEnabled(False)
+        # elif pressed_button_index == len(self.photo_button_mass) - 1:
+        #     right_arrow.setEnabled(False)
 
-        horizontal_buttons_layout.addWidget(left_arrow)
-        horizontal_buttons_layout.addWidget(right_arrow)
+        # layout.addWidget(self.left_arrow)
+        # layout.addWidget(self.right_arrow)
 
-        return horizontal_buttons_layout
+
+    # def arrow_layout_creating(self, pressed_button_index: int) -> QWidget:
+    #     horizontal_buttons_layout = QHBoxLayout()
+    #
+    #     left_arrow = QPushButton()
+    #     left_arrow.setText('<<')
+    #     left_arrow.setMinimumSize(65, 25)
+    #     self.left_arrow = left_arrow
+    #     self.left_arrow.setStyleSheet("QPushButton {background-color: rgba(255, 255, 255, 0); "
+    #                                   "border: none;}"
+    #                                   "QPushButton::hover {border: 1px solid black; "
+    #                                   "border-radius: 7px}")
+    #     # self.pushbutton_style_creator(left_arrow)
+    #     left_arrow.pressed.connect(lambda: self.arrow_button_pressing("left"))
+    #
+    #     right_arrow = QPushButton()
+    #     right_arrow.setText('>>')
+    #     right_arrow.setMinimumSize(65, 25)
+    #     self.right_arrow = right_arrow
+    #     self.pushbutton_style_creator(right_arrow)
+    #     right_arrow.pressed.connect(lambda: self.arrow_button_pressing("right"))
+    #
+    #     if pressed_button_index == 0:
+    #         left_arrow.setEnabled(False)
+    #
+    #     elif pressed_button_index == len(self.photo_button_mass) - 1:
+    #         right_arrow.setEnabled(False)
+    #
+    #     horizontal_buttons_layout.addWidget(left_arrow)
+    #     horizontal_buttons_layout.addWidget(right_arrow)
+    #
+    #     return horizontal_buttons_layout
 
 
     def right_window_changing(self, pressed_button_index: int) -> None:
@@ -469,18 +501,8 @@ class MMBody(QMainWindow):
                                                          icon_way=self.paths_to_all_files_list[pressed_button_index],
                                                          duration=100)
                 self.previous_button_index = pressed_button_index
+                self.arrow_buttons_activity_test(pressed_button_index)
 
-                if pressed_button_index == 0:
-                    self.left_arrow.setEnabled(False)
-                    self.right_arrow.setEnabled(True)
-
-                elif pressed_button_index == len(self.paths_to_all_files_list) - 1:
-                    self.right_arrow.setEnabled(False)
-                    self.left_arrow.setEnabled(True)
-
-                else:
-                    self.left_arrow.setEnabled(True)
-                    self.right_arrow.setEnabled(True)
             # Если выбрано видео
             else:
                 pass
@@ -492,6 +514,39 @@ class MMBody(QMainWindow):
             pass
 
         self.button_cancel_selection.setEnabled(True)
+
+
+    def arrow_buttons_activity_test(self, pressed_button_index: int) -> None:
+        if pressed_button_index == 0:
+            self.set_arrow_buttons_enabling(False, True)
+
+        elif pressed_button_index == len(self.paths_to_all_files_list) - 1:
+            self.set_arrow_buttons_enabling(True, False)
+
+        elif len(self.paths_to_all_files_list) == 1:
+            self.set_arrow_buttons_enabling(False, False)
+
+        else:
+            self.set_arrow_buttons_enabling(True, True)
+
+
+    def set_arrow_buttons_enabling(self, left_arrow_enabling: bool, right_arrow_enabling: bool) -> None:
+        if left_arrow_enabling != self.left_arrow.isEnabled():
+            match left_arrow_enabling:
+                case True:
+                    self.left_arrow.opacity_animation_start(self.left_arrow.opacity_effect.opacity(), 0.2)
+                case False:
+                    self.left_arrow.opacity_animation_start(self.left_arrow.opacity_effect.opacity(), 0)
+
+        if right_arrow_enabling != self.right_arrow.isEnabled():
+            match right_arrow_enabling:
+                case True:
+                    self.right_arrow.opacity_animation_start(self.right_arrow.opacity_effect.opacity(), 0.2)
+                case False:
+                    self.right_arrow.opacity_animation_start(self.right_arrow.opacity_effect.opacity(), 0)
+
+        self.left_arrow.setEnabled(left_arrow_enabling)
+        self.right_arrow.setEnabled(right_arrow_enabling)
 
 
     def right_block_create_test(self, pressed_button_index: int):
@@ -644,10 +699,10 @@ class MMBody(QMainWindow):
                 WidgetsAnimations.animated_file_change_1(self=self, icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == 0:
-                    self.left_arrow.setEnabled(False)
+                    self.set_arrow_buttons_enabling(False, self.right_arrow.isEnabled())
 
                 if not(self.right_arrow.isEnabled()):
-                    self.right_arrow.setEnabled(True)
+                    self.set_arrow_buttons_enabling(self.left_arrow.isEnabled(), True)
             # side = "right"
             else:
                 self.photo_button_mass[self.previous_button_index].setStyleSheet(
@@ -668,10 +723,10 @@ class MMBody(QMainWindow):
                 WidgetsAnimations.animated_file_change_1(self=self, icon_way=icon_way, duration=100)
 
                 if self.previous_button_index == len(self.photo_button_mass) - 1:
-                    self.right_arrow.setEnabled(False)
+                    self.set_arrow_buttons_enabling(self.left_arrow.isEnabled(), False)
 
                 if not(self.left_arrow.isEnabled()):
-                    self.left_arrow.setEnabled(True)
+                    self.set_arrow_buttons_enabling(True, self.right_arrow.isEnabled())
 
 
     def shadow_effect_init(self, duration: int) -> None:
@@ -851,7 +906,7 @@ class MMBody(QMainWindow):
             video_size = self.calculate_video_size(file_way=file_way)
             widget_size = self.back_widget.size()
 
-            self.changing_video_size_and_position(file_way=file_way)
+            # self.changing_video_size_and_position(file_way=file_way)
             self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(file_way)))
             self.video_item.setSize(QSizeF(video_size[0], video_size[1]))
             # Нужна регулировка по высоте после того, как доделаю виджеты
@@ -865,7 +920,11 @@ class MMBody(QMainWindow):
             self.media_player.play()
             self.media_player.pause()
 
-        # Не фича, а баг
+        self.arrow_buttons_activity_test(self.previous_button_index)
+        # self.left_arrow.opacity_animation_start(0, 0.2)
+        # self.right_arrow.opacity_animation_start(0, 0.2)
+
+        # Анимация работает только для фотографий
         if self.button_is_photo_mass[self.pressed_button_index]:
             opacity_effect = QGraphicsOpacityEffect(media_object)
             media_object.setGraphicsEffect(opacity_effect)
@@ -876,27 +935,40 @@ class MMBody(QMainWindow):
             self.opacity_animation.start()
             self.opacity_animation.finished.connect(lambda: self.media_shadow_effect_init(media_object))
 
+        self.arrow_buttons_change_geometry()
 
 
-    def changing_video_size_and_position(self, file_way: str) -> None:
-        """
-        Функция высчитывает оптимальный размер для QVideoWidget и центрирует его.
-        """
-        image_size = cv2.VideoCapture(file_way)
-        aspect_ratio = image_size.get(cv2.CAP_PROP_FRAME_HEIGHT) / image_size.get(cv2.CAP_PROP_FRAME_WIDTH)
-        # 575 - Высота back_widget с учетом кнопок.
-        # Horizontal orientation.
-        if aspect_ratio < 1:
-            width = 600 - 20
-            height = int(ceil(width * aspect_ratio))
-            self.video_widget.setMinimumSize(width, height)
-            self.video_widget.move(300 - width // 2, ceil((575 - height) / 2))
-        # Vertical orientation.
-        else:
-            height = 550
-            width = int(ceil(height / aspect_ratio))
-            self.video_widget.setMinimumSize(width, height)
-            self.video_widget.move(300 - width // 2, ceil((575 - height) / 2))
+    def arrow_buttons_change_geometry(self):
+        y_offset = 50
+        x_offset = 10
+        arrow_width = 20
+        arrow_height = self.back_widget.size().height() - y_offset * 2
+        self.left_arrow.setGeometry(x_offset, y_offset, arrow_width, arrow_height)
+        # Почему 525 не знаю, но получилось ровно)
+        self.right_arrow.setGeometry(525, y_offset, arrow_width, arrow_height)
+
+
+
+
+    # def changing_video_size_and_position(self, file_way: str) -> None:
+    #     """
+    #     Функция высчитывает оптимальный размер для QVideoWidget и центрирует его.
+    #     """
+    #     image_size = cv2.VideoCapture(file_way)
+    #     aspect_ratio = image_size.get(cv2.CAP_PROP_FRAME_HEIGHT) / image_size.get(cv2.CAP_PROP_FRAME_WIDTH)
+    #     # 575 - Высота back_widget с учетом кнопок.
+    #     # Horizontal orientation.
+    #     if aspect_ratio < 1:
+    #         width = 600 - 20
+    #         height = int(ceil(width * aspect_ratio))
+    #         self.video_widget.setMinimumSize(width, height)
+    #         self.video_widget.move(300 - width // 2, ceil((575 - height) / 2))
+    #     # Vertical orientation.
+    #     else:
+    #         height = 550
+    #         width = int(ceil(height / aspect_ratio))
+    #         self.video_widget.setMinimumSize(width, height)
+    #         self.video_widget.move(300 - width // 2, ceil((575 - height) / 2))
 
 
     def media_shadow_effect_init(self, media_object: QWidget) -> None:
