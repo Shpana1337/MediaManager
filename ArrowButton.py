@@ -1,11 +1,5 @@
-from PyQt5.QtGui import QPixmap, QIcon, QMouseEvent, QKeyEvent
-from PyQt5.QtMultimediaWidgets import QGraphicsVideoItem, QVideoWidget
-from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtCore import QUrl, QSize, Qt, QPropertyAnimation, QEasingCurve, QRect, QSizeF, QEvent
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QListWidget, QPushButton, QLabel, \
-    QMainWindow, QFileDialog, QLineEdit, QApplication, QStyleFactory, QWidget, \
-    QGraphicsDropShadowEffect, QSpacerItem, QSizePolicy, QComboBox, QMessageBox, \
-    QGraphicsOpacityEffect, QGraphicsScene, QGraphicsView, QSlider
+from PyQt5.QtCore import QPropertyAnimation, QEvent
+from PyQt5.QtWidgets import QPushButton, QGraphicsOpacityEffect
 
 class ArrowButton(QPushButton):
     def __init__(self, parent=None):
@@ -35,5 +29,3 @@ class ArrowButton(QPushButton):
 
     def buttonPressed(self):
         pass
-
-
