@@ -1,5 +1,5 @@
 import sqlite3
-from os import remove, stat
+from os import stat
 from collections import Counter
 from PyQt5.QtWidgets import QListWidgetItem
 
@@ -17,11 +17,10 @@ class WorkWithTags:
 
             for file_way in self.paths_to_all_files_list:
                 _file_id = stat(file_way, follow_symlinks=False).st_ino
-                _device_id = stat(file_way, follow_symlinks=False).st_dev
                 # Linux/Mac OS
                 if self.db_name.startswith("lin"):
-                    tag_indexes = cursor.execute("SELECT tag_index FROM media_files WHERE device_id = ? "
-                                                 "AND file_id = ?", (_device_id, _file_id)).fetchall()
+                    tag_indexes = cursor.execute("SELECT tag_index FROM media_files WHERE file_id = ?",
+                                                 (_file_id, )).fetchall()
                 # Windows
                 else:
                     _disk_name = file_way.split(":/")[0][-1]
@@ -53,8 +52,6 @@ class WorkWithTags:
             for i in self.changed_tags_indexes_list:
                 _file_path = self.paths_to_all_files_list[i]
                 _file_id = stat(_file_path, follow_symlinks=False).st_ino
-                _device_id = stat(_file_path, follow_symlinks=False).st_dev
-                _disk_name = _file_path.split(":/")[0][-1]
                 # Добавление новых
                 for tag in current_tags_list[i]:
                     if tag not in self.previous_tags_mass[i]:
@@ -70,6 +67,7 @@ class WorkWithTags:
                             _tag_index = _tag_index[0]
                         # Windows
                         if self.db_name.startswith("win"):
+                            _disk_name = _file_path.split(":/")[0][-1]
                             if not cursor.execute("SELECT FROM media_files WHERE disk_name = ? AND file_id = ? "
                                                   "AND tag_index = ?", (_disk_name, _file_id, _tag_index)).fetchone():
                                 cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
@@ -77,10 +75,10 @@ class WorkWithTags:
                                 cursor.execute("UPDATE tag_indexes SET count = count + 1 WHERE tag = ?", (tag,))
                         # Linux/Mac OS
                         else:
-                            if not cursor.execute("SELECT * FROM media_files WHERE device_id = ? AND file_id = ? "
-                                                  "AND tag_index = ?", (_device_id, _file_id, _tag_index)).fetchone():
-                                cursor.execute("INSERT INTO media_files VALUES(?, ?, ?)",
-                                               (_device_id, _file_id, _tag_index))
+                            if not cursor.execute("SELECT * FROM media_files WHERE file_id = ? "
+                                                  "AND tag_index = ?", (_file_id, _tag_index)).fetchone():
+                                cursor.execute("INSERT INTO media_files VALUES(?, ?)",
+                                               (_file_id, _tag_index))
                                 cursor.execute("UPDATE tag_indexes SET count = count + 1 WHERE tag = ?", (tag,))
 
                 db.commit()
@@ -93,8 +91,8 @@ class WorkWithTags:
                         if not index_and_count:
                             raise sqlite3.Error
 
-                        cursor.execute("DELETE FROM media_files WHERE device_id = ? AND file_id = ? AND tag_index = ?",
-                                       (_device_id, _file_id, index_and_count[0]))
+                        cursor.execute("DELETE FROM media_files WHERE file_id = ? AND tag_index = ?",
+                                       (_file_id, index_and_count[0]))
 
                         if index_and_count[1] - 1 == 0:
                             cursor.execute("DELETE FROM tag_indexes WHERE tag = ?", (old_tag,))
@@ -163,10 +161,10 @@ class WorkWithTags:
             for i in range(len(self.line_edits_mass)):
                 if self.line_edits_mass[i].text() != '':
                     self.changed_tags_indexes_list.add(i)
-                    WorkWithTags.add_tag(self=self ,index_=i)
+                    WorkWithTags.add_tag(self, index_=i)
             return
 
-        WorkWithTags.previous_and_present_tags_equal_test(self=self)
+        WorkWithTags.previous_and_present_tags_equal_test(self)
 
 
     @staticmethod
@@ -201,11 +199,11 @@ class WorkWithTags:
             self.list_widget_mass[index_].addItem(new_item)
 
         self.changed_tags_indexes_list.add(index_)
-        WorkWithTags.previous_and_present_tags_equal_test(self=self)
+        WorkWithTags.previous_and_present_tags_equal_test(self)
 
     @staticmethod
     def previous_and_present_tags_equal_test(self) -> None:
-        present_tags = WorkWithTags.all_tags_mass_creating(self=self)
+        present_tags = WorkWithTags.all_tags_mass_creating(self)
         is_equal = True
 
         for i in self.changed_tags_indexes_list:
